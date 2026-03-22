@@ -213,10 +213,15 @@ export default function GamePage() {
         setPhase('waiting');
       }
     }
-  }, []), useCallback(() => {
-    const nick = sessionStorage.getItem(`nick_${code}`) ?? '';
-    send({ type: 'rejoin', nickname: nick });
-  }, [code, send]));
+  }, []));
+
+  // Handle reconnection: rejoin room automatically when socket reconnects
+  useEffect(() => {
+    if (status === 'connected' && myNick) {
+      send({ type: 'rejoin', nickname: myNick });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   useEffect(() => {
     const nick = sessionStorage.getItem(`nick_${code}`) ?? '';
