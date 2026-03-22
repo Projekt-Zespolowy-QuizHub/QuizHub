@@ -2,10 +2,9 @@ name: CI
 
 on:
   push:
-<<<<<<< HEAD
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 jobs:
   # ── Backend: pytest + flake8 ──────────────────────────────────────────
@@ -31,6 +30,8 @@ jobs:
         run: pip install -r requirements.txt flake8
 
       - name: Run pytest
+        env:
+          DJANGO_SECRET_KEY: ci-secret-key
         run: pytest --tb=short -q
 
       - name: Run flake8 lint
@@ -40,7 +41,7 @@ jobs:
             --extend-ignore=W503,W504,E501 \
             --statistics
 
-  # ── Frontend: tsc + Playwright ────────────────────────────────────────
+  # ── Frontend: tsc + build ─────────────────────────────────────────────
   frontend:
     name: Frontend (Node 20)
     runs-on: ubuntu-latest
@@ -65,21 +66,11 @@ jobs:
       - name: TypeScript check
         run: npx tsc --noEmit
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Run Playwright tests
-        run: npx playwright test
+      - name: Build
         env:
-          CI: true
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report
-          path: frontend/playwright-report/
-          retention-days: 7
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_WS_URL: ws://localhost:8000
+        run: npm run build
 
   # ── Docker build verification ─────────────────────────────────────────
   docker-build:
@@ -127,61 +118,3 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
-=======
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  backend:
-    name: Backend (Django)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Install dependencies
-        working-directory: backend
-        run: pip install -r requirements.txt
-
-      - name: Run migrations
-        working-directory: backend
-        env:
-          DJANGO_SECRET_KEY: ci-secret-key
-        run: python manage.py migrate --noinput
-
-      - name: Run tests
-        working-directory: backend
-        env:
-          DJANGO_SECRET_KEY: ci-secret-key
-        run: pytest --tb=short -q
-
-  frontend:
-    name: Frontend (Next.js)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm install
-
-      - name: Build
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: http://localhost:8000
-          NEXT_PUBLIC_WS_URL: ws://localhost:8000
-        run: npm run build
->>>>>>> origin/main
