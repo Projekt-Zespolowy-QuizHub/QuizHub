@@ -97,7 +97,7 @@ test.describe('Power-upy w grze', () => {
     const bClass = await optionB.getAttribute('class');
     const cClass = await optionC.getAttribute('class');
 
-    expect(bClass + cClass).toMatch(/opacity-0|pointer-events-none/);
+    expect((bClass ?? '') + (cClass ?? '')).toMatch(/opacity-0|pointer-events-none/);
   });
 
   test('po użyciu 50/50 przycisk jest wyłączony', async ({ page }) => {

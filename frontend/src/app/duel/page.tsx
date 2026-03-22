@@ -82,14 +82,14 @@ export default function DuelPage() {
         total_rounds: 10,
       });
 
-      sessionStorage.setItem(`nick_${room.code}`, authUser.display_name);
-      setRoomCode(room.code);
+      sessionStorage.setItem(`nick_${room.room_code}`, authUser.display_name);
+      setRoomCode(room.room_code);
 
       // Przekieruj do lobby — tam czeka na drugiego gracza
       if (timerRef.current) clearInterval(timerRef.current);
       setState('found');
       setTimeout(() => {
-        router.push(`/room/${room.code}/lobby`);
+        router.push(`/room/${room.room_code}/lobby`);
       }, 800);
     } catch {
       if (timerRef.current) clearInterval(timerRef.current);

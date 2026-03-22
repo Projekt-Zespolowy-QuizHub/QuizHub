@@ -168,5 +168,5 @@ def test_public_game_endpoint():
     resp = client.get('/api/rooms/public/next/')
     assert resp.status_code == 200
     data = resp.json()
-    assert 'code' in data
-    assert 'scheduled_at' in data
+    assert 'room_id' in data
+    assert 'start_time' in data

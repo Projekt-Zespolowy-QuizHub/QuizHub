@@ -87,7 +87,7 @@ test.describe('Tryb Przetrwania', () => {
     // Kliknij Kanada (niepoprawna) - idx 0
     const firstQuestion = page.getByText(/Który kraj jest największy powierzchniowo/);
     if (await firstQuestion.isVisible()) {
-      await page.getByRole('button', { hasText: /A\.\s*Kanada/ }).click();
+      await page.getByRole('button', { name: /A\.\s*Kanada/ }).click();
       // Po złej odpowiedzi jedno serce powinno zniknąć (2 filled hearts)
       await page.waitForTimeout(1500); // czekaj na animację
     }
