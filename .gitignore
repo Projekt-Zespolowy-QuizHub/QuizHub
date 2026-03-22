@@ -1,0 +1,104 @@
+# ============================================================
+# Python / Django
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Django
+backend/db.sqlite3
+backend/staticfiles/
+backend/media/
+
+# Virtualenv
+backend/venv/
+
+# ============================================================
+# Node / Next.js
+# ============================================================
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/.pnp
+frontend/.pnp.js
+frontend/.yarn/install-state.gz
+
+# ============================================================
+# IDE
+# ============================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ============================================================
+# Environment files
+# ============================================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+frontend/.env.local
+docker/dev/.env.dev
+docker/prod/.env.prod
+
+# ============================================================
+# Logs
+# ============================================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================================
+# Claude Code internals
+# ============================================================
+.claude/
+
+# ============================================================
+# Keep example files
+# ============================================================
+!.env.example
+!backend/.env.example
+!frontend/.env.local.example
+!docker/dev/.env.dev.example
+!docker/prod/.env.prod.example
