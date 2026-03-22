@@ -1,9 +1,12 @@
+export const FREE_AVATAR_KEYS = new Set(['fox', 'cat', 'bear', 'wolf']);
+
 export const AVATARS = [
   { key: 'fox',       emoji: '🦊' },
+  { key: 'cat',       emoji: '🐱' },
+  { key: 'bear',      emoji: '🐻' },
   { key: 'wolf',      emoji: '🐺' },
   { key: 'lion',      emoji: '🦁' },
   { key: 'tiger',     emoji: '🐯' },
-  { key: 'bear',      emoji: '🐻' },
   { key: 'raccoon',   emoji: '🦝' },
   { key: 'frog',      emoji: '🐸' },
   { key: 'penguin',   emoji: '🐧' },
@@ -14,7 +17,6 @@ export const AVATARS = [
   { key: 'octopus',   emoji: '🐙' },
   { key: 'shark',     emoji: '🦈' },
   { key: 'turtle',    emoji: '🐢' },
-  { key: 'cat',       emoji: '🐱' },
   { key: 'robot',     emoji: '🤖' },
   { key: 'alien',     emoji: '👾' },
   { key: 'ninja',     emoji: '🥷' },

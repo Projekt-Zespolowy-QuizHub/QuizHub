@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthProvider';
 import { api, Achievement, UserStats } from '@/lib/api';
-import { AVATARS, getAvatarEmoji } from '@/lib/avatars';
+import { AVATARS, FREE_AVATAR_KEYS, getAvatarEmoji } from '@/lib/avatars';
 import { TabBar } from '@/components/TabBar';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Skeleton, SkeletonCard, SkeletonProfile } from '@/components/Skeleton';
@@ -105,34 +105,49 @@ function AchievementsTab({ achievements }: { achievements: Achievement[] | null 
 interface AvatarTabProps {
   currentAvatar: string;
   saving: boolean;
+  ownedAvatarKeys: Set<string>;
   onSelect: (key: string) => void;
 }
 
-function AvatarTab({ currentAvatar, saving, onSelect }: AvatarTabProps) {
+function AvatarTab({ currentAvatar, saving, ownedAvatarKeys, onSelect }: AvatarTabProps) {
   const { t } = useLocale();
   return (
     <div className="glass-card p-6">
       <h3 className="text-white font-bold mb-4">{t('profile_choose_avatar')}</h3>
       <div className="grid grid-cols-5 gap-3">
-        {AVATARS.map(a => (
-          <button
-            key={a.key}
-            onClick={() => onSelect(a.key)}
-            disabled={saving}
-            className={`aspect-square rounded-xl text-3xl flex items-center justify-center transition-all ${
-              currentAvatar === a.key
-                ? 'bg-yellow-400/20 border-2 border-yellow-400 scale-110'
-                : 'bg-white/5 border-2 border-transparent hover:bg-white/10 hover:scale-105'
-            }`}
-            title={a.key}
-          >
-            {a.emoji}
-          </button>
-        ))}
+        {AVATARS.map(a => {
+          const isFree = FREE_AVATAR_KEYS.has(a.key);
+          const isOwned = isFree || ownedAvatarKeys.has(a.key);
+          const isActive = currentAvatar === a.key;
+          return (
+            <button
+              key={a.key}
+              onClick={() => isOwned ? onSelect(a.key) : undefined}
+              disabled={saving || !isOwned}
+              title={isOwned ? a.key : 'Kup w sklepie'}
+              className={`relative aspect-square rounded-xl text-3xl flex items-center justify-center transition-all ${
+                isActive
+                  ? 'bg-yellow-400/20 border-2 border-yellow-400 scale-110'
+                  : isOwned
+                  ? 'bg-white/5 border-2 border-transparent hover:bg-white/10 hover:scale-105'
+                  : 'bg-white/3 border-2 border-white/10 opacity-50 cursor-not-allowed'
+              }`}
+            >
+              {a.emoji}
+              {!isOwned && (
+                <span className="absolute bottom-1 right-1 text-xs">🔒</span>
+              )}
+            </button>
+          );
+        })}
       </div>
       {saving && (
         <p className="text-white/40 text-sm mt-4 animate-pulse">{t('profile_saving')}</p>
       )}
+      <p className="text-white/30 text-xs mt-4">
+        🔒 Zablokowane avatary możesz kupić w{' '}
+        <a href="/shop" className="text-yellow-400 hover:underline">sklepie</a>.
+      </p>
     </div>
   );
 }
@@ -144,6 +159,7 @@ export default function ProfilePage() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [achievements, setAchievements] = useState<Achievement[] | null>(null);
   const [savingAvatar, setSavingAvatar] = useState(false);
+  const [ownedAvatarKeys, setOwnedAvatarKeys] = useState<Set<string>>(new Set());
 
   const TABS = [
     { key: 'stats' as Tab, label: t('profile_stats_tab') },
@@ -158,6 +174,17 @@ export default function ProfilePage() {
   useEffect(() => {
     if (tab === 'achievements') {
       api.getAchievements().then(setAchievements).catch(() => {});
+    }
+    if (tab === 'avatar') {
+      api.getShopItems().then((items) => {
+        const keys = new Set(
+          items
+            .filter((i: { item_type: string; avatar_key?: string; owned: boolean }) =>
+              i.item_type === 'avatar' && i.avatar_key && i.owned)
+            .map((i: { avatar_key: string }) => i.avatar_key)
+        );
+        setOwnedAvatarKeys(keys);
+      }).catch(() => {});
     }
   }, [tab]);
 
@@ -203,6 +230,7 @@ export default function ProfilePage() {
         <AvatarTab
           currentAvatar={user.avatar}
           saving={savingAvatar}
+          ownedAvatarKeys={ownedAvatarKeys}
           onSelect={handleAvatarSelect}
         />
       )}

@@ -68,14 +68,24 @@ class Achievement(models.Model):
     class ConditionType(models.TextChoices):
         FIRST_BLOOD = 'first_blood', 'First Blood'
         PERFECT_ROUND = 'perfect_round', 'Perfect Round'
-        HOT_STREAK_5 = 'hot_streak_5', 'Hot Streak 5'
-        HOT_STREAK_10 = 'hot_streak_10', 'Hot Streak 10'
-        HOT_STREAK_20 = 'hot_streak_20', 'Hot Streak 20'
+        HOT_STREAK_10 = 'hot_streak_10', 'On Fire'
+        HOT_STREAK_20 = 'hot_streak_20', 'Unstoppable'
+        HOT_STREAK_50 = 'hot_streak_50', 'Legendary'
         VETERAN = 'veteran', 'Veteran'
         ADDICT = 'addict', 'Addict'
+        NO_LIFER = 'no_lifer', 'No-Lifer'
         SOCIAL_BUTTERFLY = 'social_butterfly', 'Social Butterfly'
         SPEED_DEMON = 'speed_demon', 'Speed Demon'
+        LIGHTNING = 'lightning', 'Lightning'
         COMEBACK_KING = 'comeback_king', 'Comeback King'
+        FLAWLESS_VICTORY = 'flawless_victory', 'Flawless Victory'
+        RICH = 'rich', 'Rich'
+        WHALE = 'whale', 'Whale'
+        COLLECTOR = 'collector', 'Collector'
+        TOURNAMENT_CHAMPION = 'tournament_champion', 'Tournament Champion'
+        CLAN_LEADER = 'clan_leader', 'Clan Leader'
+        SURVIVOR = 'survivor', 'Survivor'
+        DUELIST = 'duelist', 'Duelist'
 
     name = models.CharField(max_length=50)
     description = models.TextField()
@@ -213,12 +223,14 @@ class ShopItem(models.Model):
         PROFILE_FRAME = 'profile_frame', 'Ramka profilu'
         CONFETTI_EFFECT = 'confetti_effect', 'Efekt confetti'
         TITLE = 'title', 'Tytuł'
+        AVATAR = 'avatar', 'Avatar'
 
     name = models.CharField(max_length=50)
     description = models.TextField()
     item_type = models.CharField(max_length=20, choices=ItemType.choices)
     price = models.IntegerField()
     emoji_icon = models.CharField(max_length=10)
+    avatar_key = models.CharField(max_length=20, blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:

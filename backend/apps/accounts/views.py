@@ -652,6 +652,20 @@ class UpdateAvatarView(APIView):
         valid_keys = [k for k, _ in AVATAR_CHOICES]
         if avatar not in valid_keys:
             return Response({'error': 'Invalid avatar'}, status=status.HTTP_400_BAD_REQUEST)
+
+        FREE_AVATARS = {'fox', 'cat', 'bear', 'wolf'}
+        if avatar not in FREE_AVATARS:
+            owns = UserItem.objects.filter(
+                user=request.user,
+                item__item_type=ShopItem.ItemType.AVATAR,
+                item__avatar_key=avatar,
+            ).exists()
+            if not owns:
+                return Response(
+                    {'error': 'Musisz najpierw kupić ten avatar w sklepie'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         profile = request.user.profile
         profile.avatar = avatar
         profile.save()
@@ -1351,6 +1365,7 @@ class ShopListView(APIView):
                 'item_type': item.item_type,
                 'price': item.price,
                 'emoji_icon': item.emoji_icon,
+                'avatar_key': item.avatar_key,
                 'owned': item.id in owned_ids,
             }
             for item in items

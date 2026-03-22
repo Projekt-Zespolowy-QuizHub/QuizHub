@@ -262,4 +262,16 @@ export const api = {
     }),
   deleteQuestion: (packId: number, qId: number) =>
     apiFetch<void>(`/packs/${packId}/questions/${qId}/`, { method: 'DELETE' }),
+
+  // Shop
+  getShopItems: () =>
+    apiFetch<Array<{
+      id: number; name: string; description: string;
+      item_type: string; price: number; emoji_icon: string;
+      avatar_key: string | null; owned: boolean;
+    }>>('/shop/'),
+  buyShopItem: (item_id: number) =>
+    apiFetch<{ message: string; coins: number }>('/shop/buy/', { method: 'POST', body: JSON.stringify({ item_id }) }),
+  getCoins: () =>
+    apiFetch<{ coins: number }>('/shop/coins/'),
 };

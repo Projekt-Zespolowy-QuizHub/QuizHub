@@ -333,9 +333,9 @@ class Command(BaseCommand):
     def _seed_achievements_for_users(self, users, achievements):
         self.stdout.write("\n[5/5] Odblokowane osiągnięcia...")
         assignments = [
-            (users[0], ["first_blood", "hot_streak_5", "speed_demon", "social_butterfly"]),
-            (users[1], ["first_blood", "perfect_round", "veteran"]),
-            (users[2], ["first_blood", "hot_streak_5", "hot_streak_10"]),
+            (users[0], ["first_blood", "speed_demon", "rich"]),
+            (users[1], ["first_blood", "perfect_round", "hot_streak_10"]),
+            (users[2], ["first_blood", "hot_streak_10", "hot_streak_20"]),
             (users[3], ["first_blood", "comeback_king"]),
             (users[4], ["first_blood"]),
         ]
