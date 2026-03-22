@@ -53,10 +53,14 @@ export default function LobbyPage() {
     if (msg.type === 'chat_message') {
       setChatMessages(prev => [...prev, { nickname: msg.nickname, text: msg.text }]);
     }
-  }, [code, router]), useCallback(() => {
-    const nick = sessionStorage.getItem(`nick_${code}`) ?? '';
-    send({ type: 'rejoin', nickname: nick });
-  }, [code, send]));
+  }, [code, router]));
+
+  useEffect(() => {
+    if (status === 'connected' && myNick) {
+      send({ type: 'rejoin', nickname: myNick });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });

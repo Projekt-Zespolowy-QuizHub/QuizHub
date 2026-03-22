@@ -1,0 +1,45 @@
+# Tłumaczenia polskie dla QuizArena
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: pl\n"
+
+msgid "Logged out"
+msgstr "Wylogowano"
+
+msgid "Invalid credentials"
+msgstr "Nieprawidłowe dane logowania"
+
+msgid "User not found"
+msgstr "Użytkownik nie znaleziony"
+
+msgid "Cannot add yourself"
+msgstr "Nie możesz dodać siebie"
+
+msgid "Request already exists"
+msgstr "Zaproszenie już istnieje"
+
+msgid "Request not found"
+msgstr "Zaproszenie nie znalezione"
+
+msgid "Request sent"
+msgstr "Zaproszenie wysłane"
+
+msgid "Accepted"
+msgstr "Zaakceptowano"
+
+msgid "Rejected"
+msgstr "Odrzucono"
+
+msgid "Invalid avatar"
+msgstr "Nieprawidłowy awatar"
+
+msgid "Room does not exist."
+msgstr "Pokój nie istnieje."
+
+msgid "Game is already in progress or finished."
+msgstr "Gra już trwa lub jest zakończona."
+
+msgid "Nickname is already taken in this room."
+msgstr "Nick jest już zajęty w tym pokoju."

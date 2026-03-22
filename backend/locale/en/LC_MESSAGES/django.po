@@ -1,0 +1,45 @@
+# English translations for QuizArena
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
+
+msgid "Logged out"
+msgstr "Logged out"
+
+msgid "Invalid credentials"
+msgstr "Invalid credentials"
+
+msgid "User not found"
+msgstr "User not found"
+
+msgid "Cannot add yourself"
+msgstr "Cannot add yourself"
+
+msgid "Request already exists"
+msgstr "Request already exists"
+
+msgid "Request not found"
+msgstr "Request not found"
+
+msgid "Request sent"
+msgstr "Request sent"
+
+msgid "Accepted"
+msgstr "Accepted"
+
+msgid "Rejected"
+msgstr "Rejected"
+
+msgid "Invalid avatar"
+msgstr "Invalid avatar"
+
+msgid "Room does not exist."
+msgstr "Room does not exist."
+
+msgid "Game is already in progress or finished."
+msgstr "Game is already in progress or finished."
+
+msgid "Nickname is already taken in this room."
+msgstr "Nickname is already taken in this room."

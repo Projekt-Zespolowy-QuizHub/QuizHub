@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+<<<<<<< HEAD
     branches: [main, master]
   pull_request:
     branches: [main, master]
@@ -126,3 +127,61 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+=======
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (Django)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Run migrations
+        working-directory: backend
+        env:
+          DJANGO_SECRET_KEY: ci-secret-key
+        run: python manage.py migrate --noinput
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          DJANGO_SECRET_KEY: ci-secret-key
+        run: pytest --tb=short -q
+
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_WS_URL: ws://localhost:8000
+        run: npm run build
+>>>>>>> origin/main
