@@ -2,7 +2,6 @@ import json
 import asyncio
 import random
 import logging
-from typing import Optional
 import google.generativeai as genai
 from django.conf import settings
 
@@ -120,7 +119,7 @@ class QuestionGenerator:
         used_str = ""
         if used_questions:
             last_used = used_questions[-10:]
-            used_str = f"\n\nNIE powtarzaj tych pytań:\n" + "\n".join(f"- {q}" for q in last_used)
+            used_str = "\n\nNIE powtarzaj tych pytań:\n" + "\n".join(f"- {q}" for q in last_used)
 
         prompt = f"""Wygeneruj JEDNO pytanie quizowe z kategorii: {category_pl}.
 

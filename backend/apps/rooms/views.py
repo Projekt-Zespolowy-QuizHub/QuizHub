@@ -8,12 +8,12 @@ from django.core.cache import cache
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, inline_serializer
 from .models import Room, Player, QuestionPack, CustomQuestion, PublicTournamentConfig
-
-CACHE_TTL_ROOM_HISTORY = 60  # 1 minuta
 from .serializers import (
     CreateRoomSerializer, JoinRoomSerializer,
     RoomSerializer, LeaderboardSerializer
 )
+
+CACHE_TTL_ROOM_HISTORY = 60  # 1 minuta
 
 logger = logging.getLogger(__name__)
 
@@ -626,7 +626,6 @@ class TriggerPublicTournamentView(APIView):
         import random
         from datetime import timedelta
         from apps.rooms.constants import QUIZ_CATEGORIES
-        config = PublicTournamentConfig.get()
         now = timezone.now()
         start_time = now + timedelta(minutes=5)
         categories = random.sample(QUIZ_CATEGORIES, 3)

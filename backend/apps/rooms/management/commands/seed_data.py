@@ -152,7 +152,7 @@ class Command(BaseCommand):
         achievements = self._seed_achievements()
         users, profiles = self._seed_users()
         self._seed_friendships(users)
-        rooms = self._seed_rooms(users, profiles)
+        self._seed_rooms(users, profiles)
         self._seed_achievements_for_users(users, achievements)
         self.stdout.write(self.style.SUCCESS("\nGotowe! Dane seed zostały wczytane pomyślnie."))
 
