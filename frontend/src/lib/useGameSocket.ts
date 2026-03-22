@@ -9,7 +9,7 @@ const MAX_RETRIES = 5;
 export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
 
 export type WSMessage =
-  | { type: 'player_joined'; nickname: string }
+  | { type: 'player_joined'; nickname: string; avatar?: string }
   | { type: 'player_left'; nickname: string }
   | { type: 'game_start'; total_rounds: number; categories: string[] }
   | { type: 'question'; round_number: number; total_rounds: number; question: string; options: string[] }
