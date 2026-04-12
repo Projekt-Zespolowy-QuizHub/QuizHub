@@ -1,6 +1,9 @@
 import { cookies } from 'next/headers';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+const BACKEND_URL =
+  process.env.BACKEND_INTERNAL_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  'http://localhost:8000';
 
 export async function serverFetch<T>(path: string): Promise<T | null> {
   try {

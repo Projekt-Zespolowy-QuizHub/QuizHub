@@ -76,6 +76,8 @@ frontend/.yarn/install-state.gz
 .env.development.local
 .env.test.local
 .env.production.local
+.env.prod
+.env.prod.local
 backend/.env
 frontend/.env.local
 docker/dev/.env.dev

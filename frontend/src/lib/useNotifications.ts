@@ -24,7 +24,7 @@ export function useNotifications(onMessage: OnMessageFn) {
 
   const connect = useCallback(() => {
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = process.env.NEXT_PUBLIC_WS_HOST ?? 'localhost:8000';
+    const host = process.env.NEXT_PUBLIC_WS_HOST ?? window.location.host;
     const ws = new WebSocket(`${proto}://${host}/ws/notifications/`);
 
     ws.onmessage = (event) => {

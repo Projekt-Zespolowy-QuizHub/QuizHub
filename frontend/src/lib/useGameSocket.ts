@@ -1,7 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8000';
-
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_MAX_MS = 10_000;
 const MAX_RETRIES = 5;
@@ -53,7 +51,12 @@ export function useGameSocket(
     isFirstConnectRef.current = true;
 
     function doConnect() {
-      const ws = new WebSocket(`${WS_URL}/ws/room/${roomCode}/`);
+      const wsBase =
+        process.env.NEXT_PUBLIC_WS_URL ??
+        (typeof window !== 'undefined'
+          ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`
+          : 'ws://localhost:8000');
+      const ws = new WebSocket(`${wsBase}/ws/room/${roomCode}/`);
       wsRef.current = ws;
 
       ws.onopen = () => {
