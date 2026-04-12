@@ -35,35 +35,53 @@ The frontend currently reads:
 - `NEXT_PUBLIC_WS_URL`
 - `NEXT_PUBLIC_WS_HOST`
 
-## Deploy Without a Domain
+## Deploy With a Domain and HTTPS
 
 1. Copy `.env.prod.example` to `.env.prod`.
-2. Replace the placeholder secrets and IP address values.
-3. Build and start:
+2. Replace the placeholder secrets and domain values.
+3. Point both `quizhub.tech` and `www.quizhub.tech` to the server IP.
+4. Install Certbot on the host and create the challenge webroot:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y certbot
+sudo mkdir -p /var/www/certbot
+```
+
+5. Issue the certificate on the host before enabling the TLS Nginx config:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml stop nginx
+sudo certbot certonly --standalone \
+  -d quizhub.tech \
+  -d www.quizhub.tech \
+  -m you@example.com \
+  --agree-tos \
+  --no-eff-email
+```
+
+6. Build and start:
 
 ```bash
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
 
-4. Verify:
+7. Verify:
 
 ```bash
 docker compose --env-file .env.prod -f docker-compose.prod.yml ps
-curl http://YOUR_SERVER_IP/
-curl http://YOUR_SERVER_IP/api/schema/
+curl -I https://quizhub.tech/
+curl https://quizhub.tech/api/schema/
+```
+
+8. Renew automatically from the host with a post-hook reload:
+
+```bash
+sudo certbot renew --post-hook "cd /PATH/TO/REPO && docker compose --env-file .env.prod -f docker-compose.prod.yml restart nginx"
 ```
 
 ## Notes
 
-- The app is configured to run over plain HTTP by IP first.
-- When a domain is added later, update:
-  - `PUBLIC_ORIGIN`
-  - `ALLOWED_HOSTS`
-  - `CORS_ALLOWED_ORIGINS`
-  - `CSRF_TRUSTED_ORIGINS`
-  - `NEXT_PUBLIC_WS_URL`
-  - `NEXT_PUBLIC_WS_HOST`
-- After adding HTTPS behind Nginx, set:
-  - `SESSION_COOKIE_SECURE=True`
-  - `CSRF_COOKIE_SECURE=True`
-  - `SECURE_SSL_REDIRECT=True`
+- Nginx serves ACME challenge files from `/var/www/certbot` mounted from the host.
+- Certificates are expected at `/etc/letsencrypt/live/quizhub.tech/`.
+- Keep `165.245.212.111` in `ALLOWED_HOSTS` if you still want direct IP access for diagnostics.
