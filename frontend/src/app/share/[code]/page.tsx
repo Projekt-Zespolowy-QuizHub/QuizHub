@@ -41,7 +41,7 @@ export default async function SharePage({ params }: Props) {
         style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)' }}
       >
         <div className="text-4xl mb-2">🏆</div>
-        <h1 className="text-xl font-black text-yellow-400 mb-1">QuizArena</h1>
+        <h1 className="text-xl font-black text-yellow-400 mb-1">QuizHub</h1>
         <p className="text-white/50 text-sm mb-4">Gra #{data.room_code}</p>
 
         {winner && (
@@ -66,7 +66,7 @@ export default async function SharePage({ params }: Props) {
           ))}
         </div>
 
-        <p className="text-white/30 text-xs mt-4">quizarena.app</p>
+        <p className="text-white/30 text-xs mt-4">quizhub.tech</p>
       </div>
 
       <div className="mt-6 flex gap-3">

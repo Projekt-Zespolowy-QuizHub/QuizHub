@@ -188,7 +188,7 @@ export default function Navbar() {
   if (!user) {
     return (
       <nav className="px-4 sm:px-8 py-4 flex items-center justify-between animate-fade-in">
-        <Link href="/" className="text-yellow-400 font-bold text-xl">QuizArena</Link>
+        <Link href="/" className="text-yellow-400 font-bold text-xl">QuizHub</Link>
         <div className="flex items-center gap-4 text-sm">
           <LanguageSwitcher />
           <Link href="/login" className="text-white/80 hover:text-white transition-colors">{t('nav_login')}</Link>
@@ -206,7 +206,7 @@ export default function Navbar() {
 
           {/* Brand */}
           <Link href="/dashboard" className="text-yellow-400 font-bold text-xl shrink-0">
-            QuizArena
+            QuizHub
           </Link>
 
           {/* Desktop groups */}
@@ -279,7 +279,7 @@ export default function Navbar() {
               onClick={() => setMobileOpen(false)}
               className="text-yellow-400 font-bold text-xl"
             >
-              QuizArena
+              QuizHub
             </Link>
             <button
               onClick={() => setMobileOpen(false)}

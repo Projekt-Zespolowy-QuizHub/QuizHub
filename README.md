@@ -1,8 +1,8 @@
-# QuizArena
+# QuizHub
 
 <!-- LOGO PLACEHOLDER -->
 <p align="center">
-  <img src="docs/logo-placeholder.png" alt="QuizArena Logo" width="200"/>
+  <img src="docs/logo-placeholder.png" alt="QuizHub Logo" width="200"/>
 </p>
 
 <p align="center">
