@@ -21,6 +21,23 @@
 
 ---
 
+## Production Deployment
+
+- Production app runs at **https://quizhub.tech**
+- `http://quizhub.tech` redirects to HTTPS
+- `https://www.quizhub.tech` is covered by the same deployment
+- SSL/TLS certificate is issued by **Let's Encrypt**
+- Production Docker and Nginx deployment config is maintained on branch `deployment`
+
+Production setup on this branch includes:
+
+- Nginx reverse proxy for frontend, API, static files, media, and WebSocket traffic
+- HTTPS on port `443`
+- ACME / Let's Encrypt support for certificate issuance and renewal
+- Secure production cookie settings for Django
+
+---
+
 ## Features
 
 - **Real-time multiplayer** — WebSocket-based gameplay with instant score updates
