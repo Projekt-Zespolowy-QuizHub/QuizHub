@@ -5,7 +5,13 @@ from channels.testing import WebsocketCommunicator
 from channels.db import database_sync_to_async
 from quizarena.asgi import application
 from apps.rooms.models import Room, Player
-from apps.rooms.consumers import GameConsumer, _disconnect_tasks, _powerups_used, _double_points_active
+from apps.rooms.consumers import (
+    GameConsumer,
+    _disconnect_tasks,
+    _powerups_used,
+    _double_points_active,
+    _round_tasks,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -18,10 +24,14 @@ def use_channel_layers(channel_layers):
 async def clear_disconnect_tasks():
     """Ensure no leftover tasks between tests."""
     _disconnect_tasks.clear()
+    _round_tasks.clear()
     yield
     for task in list(_disconnect_tasks.values()):
         task.cancel()
+    for task in list(_round_tasks.values()):
+        task.cancel()
     _disconnect_tasks.clear()
+    _round_tasks.clear()
 
 
 @pytest.fixture
@@ -32,6 +42,13 @@ def short_grace(monkeypatch):
 @pytest_asyncio.fixture
 async def room():
     return await database_sync_to_async(Room.objects.create)(code='TSTROM')
+
+
+@pytest.fixture
+def fast_rounds(monkeypatch):
+    monkeypatch.setattr(GameConsumer, 'START_DELAY_SECONDS', 0.01)
+    monkeypatch.setattr(GameConsumer, 'ANSWER_REVEAL_SECONDS', 0.01)
+    monkeypatch.setattr(GameConsumer, 'ROUND_DURATION_SECONDS', 1)
 
 
 async def _connect_and_join(room_code: str, nickname: str) -> WebsocketCommunicator:
@@ -216,3 +233,64 @@ async def test_powerup_cannot_use_twice(room, clear_powerup_state):
     assert await player.receive_nothing(timeout=0.2)
 
     await player.disconnect()
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_single_player_answer_advances_to_next_question(room, fast_rounds, monkeypatch):
+    from apps.rooms.models import Player
+
+    room.total_rounds = 2
+    await database_sync_to_async(room.save)()
+    await database_sync_to_async(Player.objects.create)(room=room, nickname='Solo')
+
+    questions = iter([
+        {
+            'question': 'Pytanie 1?',
+            'options': ['A1', 'B1', 'C1', 'D1'],
+            'correct': 'A',
+            'explanation': 'Wyjaśnienie 1',
+        },
+        {
+            'question': 'Pytanie 2?',
+            'options': ['A2', 'B2', 'C2', 'D2'],
+            'correct': 'B',
+            'explanation': 'Wyjaśnienie 2',
+        },
+    ])
+
+    async def fake_generate(self, category, used_questions, max_retries=3):
+        return next(questions)
+
+    monkeypatch.setattr('apps.ai.generator.QuestionGenerator.generate', fake_generate)
+
+    comm = await _connect_and_join(room.code, 'Solo')
+    await comm.receive_json_from()  # własny player_joined
+
+    await comm.send_json_to({'type': 'start_game'})
+    msg = await asyncio.wait_for(comm.receive_json_from(), timeout=1.0)
+    assert msg['type'] == 'game_start'
+
+    first_question = await asyncio.wait_for(comm.receive_json_from(), timeout=1.0)
+    assert first_question['type'] == 'question'
+    assert first_question['round_number'] == 1
+    assert first_question['question'] == 'Pytanie 1?'
+
+    await comm.send_json_to({
+        'type': 'answer',
+        'nickname': 'Solo',
+        'answer': 'A',
+        'response_time_ms': 1000,
+        'round_number': 1,
+    })
+
+    result = await asyncio.wait_for(comm.receive_json_from(), timeout=1.0)
+    assert result['type'] == 'answer_result'
+    assert result['is_correct'] is True
+
+    second_question = await asyncio.wait_for(comm.receive_json_from(), timeout=1.0)
+    assert second_question['type'] == 'question'
+    assert second_question['round_number'] == 2
+    assert second_question['question'] == 'Pytanie 2?'
+
+    await comm.disconnect()

@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 # Keyed by (room_code, nickname) → asyncio.Task that will broadcast player_left
 _disconnect_tasks: dict[tuple[str, str], asyncio.Task] = {}
 
+# Keyed by room_code → asyncio.Task that advances current round after timeout
+_round_tasks: dict[str, asyncio.Task] = {}
+
 # Keyed by (room_code, nickname) → set of used powerup names
 _powerups_used: dict[tuple[str, str], set[str]] = {}
 
@@ -115,6 +118,9 @@ class GameConsumer(AsyncWebsocketConsumer):
     """
 
     GRACE_PERIOD_SECONDS = 30
+    START_DELAY_SECONDS = 2
+    ROUND_DURATION_SECONDS = 30
+    ANSWER_REVEAL_SECONDS = 2
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -314,7 +320,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             'game_mode': room.game_mode,
         })
 
-        await asyncio.sleep(2)
+        await asyncio.sleep(self.START_DELAY_SECONDS)
         await self.send_next_question(room)
         return True
 
@@ -405,6 +411,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             'streak': new_streak,
             'multiplier': multiplier,
         }))
+        await self._maybe_advance_round(room, round_number)
 
     @staticmethod
     def _compute_score(
@@ -503,6 +510,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         """Generuje następne pytanie (AI lub z paczki) i rozsyła do grupy."""
         from .models import Question
 
+        self._cancel_round_task(room.code)
         room.current_round += 1
         await database_sync_to_async(room.save)()
 
@@ -542,6 +550,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             'question': question.content,
             'options': question.options,
         })
+        self._schedule_round_task(room.code, room.current_round)
 
     async def _send_pack_question(self, room, Question):
         """Pobiera pytanie z paczki użytkownika."""
@@ -590,6 +599,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             'question': question.content,
             'options': question.options,
         })
+        self._schedule_round_task(room.code, room.current_round)
 
     async def send_game_over(self, room):
         """Gra skończona — wyślij finalny leaderboard, zaktualizuj profile i sprawdź achievementy."""
@@ -598,6 +608,8 @@ class GameConsumer(AsyncWebsocketConsumer):
         from apps.accounts.models import AVATAR_EMOJI
         from apps.accounts.achievements import check_and_award_achievements
         from django.core.cache import cache
+
+        self._cancel_round_task(room.code)
 
         player_objs = await database_sync_to_async(
             lambda: list(
@@ -644,6 +656,87 @@ class GameConsumer(AsyncWebsocketConsumer):
             'type': 'game_over',
             'leaderboard': leaderboard,
         })
+
+    async def _maybe_advance_round(self, room, round_number: int) -> None:
+        """Jeśli wszyscy aktywni gracze odpowiedzieli, przejdź do następnej rundy wcześniej."""
+        if round_number is None:
+            return
+
+        should_advance = await database_sync_to_async(
+            self._all_active_players_answered
+        )(room.code, round_number)
+        if not should_advance:
+            return
+
+        self._cancel_round_task(room.code)
+        await asyncio.sleep(self.ANSWER_REVEAL_SECONDS)
+
+        from .models import Room
+
+        try:
+            refreshed_room = await database_sync_to_async(Room.objects.get)(code=room.code)
+        except Room.DoesNotExist:
+            return
+
+        if (
+            refreshed_room.status == Room.Status.IN_PROGRESS
+            and refreshed_room.current_round == round_number
+        ):
+            await self.send_next_question(refreshed_room)
+
+    def _schedule_round_task(self, room_code: str, round_number: int) -> None:
+        """Ustaw timeout rundy, który wymusi przejście dalej nawet bez wszystkich odpowiedzi."""
+        self._cancel_round_task(room_code)
+        _round_tasks[room_code] = asyncio.create_task(
+            self._advance_round_after_timeout(room_code, round_number)
+        )
+
+    def _cancel_round_task(self, room_code: str) -> None:
+        task = _round_tasks.pop(room_code, None)
+        if task and not task.done():
+            task.cancel()
+
+    async def _advance_round_after_timeout(self, room_code: str, round_number: int) -> None:
+        from .models import Room
+
+        try:
+            await asyncio.sleep(self.ROUND_DURATION_SECONDS)
+            room = await database_sync_to_async(Room.objects.get)(code=room_code)
+            if (
+                room.status == Room.Status.IN_PROGRESS
+                and room.current_round == round_number
+            ):
+                await self.send_next_question(room)
+        except asyncio.CancelledError:
+            raise
+        finally:
+            current = _round_tasks.get(room_code)
+            if current is asyncio.current_task():
+                _round_tasks.pop(room_code, None)
+
+    @staticmethod
+    def _all_active_players_answered(room_code: str, round_number: int) -> bool:
+        """Sprawdza, czy wszyscy aktywni gracze mają już odpowiedź dla bieżącej rundy."""
+        from .models import Answer, Player, Question, Room
+
+        room = Room.objects.get(code=room_code)
+        question = Question.objects.get(room=room, round_number=round_number)
+        players = list(Player.objects.filter(room=room))
+        if room.game_mode == Room.GameMode.SURVIVAL:
+            players = [
+                player for player in players
+                if not _survival_eliminated.get((room_code, player.nickname), False)
+            ]
+
+        if not players:
+            return False
+
+        answered_nicknames = set(
+            Answer.objects.filter(question=question)
+            .values_list('player__nickname', flat=True)
+        )
+        active_nicknames = {player.nickname for player in players}
+        return active_nicknames.issubset(answered_nicknames)
 
     # ─── Group message handlers (wysyłanie do klientów) ───────────────────
 
