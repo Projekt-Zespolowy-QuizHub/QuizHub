@@ -97,6 +97,14 @@ yarn-error.log*
 .claude/
 
 # ============================================================
+# Internal AI / agent workflow docs
+# ============================================================
+docs/superpowers/
+docs/DEPLOYMENT_PLAN.md
+docs/ANALIZA_STATUSU.md
+docs/AUDIT_REPORT.md
+
+# ============================================================
 # Keep example files
 # ============================================================
 !.env.example
