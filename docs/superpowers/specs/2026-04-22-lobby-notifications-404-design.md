@@ -188,11 +188,15 @@ async def _get_grace_period(self) -> int:
      | FriendRequestAcceptedNotification;
    ```
 
-2. Nowy komponent `RichToast` (lub `ActionToast`) — toast z opcjonalnymi przyciskami akcji. Rozszerza istniejący `ToastContext`:
+2. Rozszerzyć istniejący `ToastContext` o **opcjonalne akcje** (4. parametr `actions`):
    ```ts
-   show(message: string, type: 'info'|'success'|..., actions?: Array<{label, onClick}>)
+   show(
+     message: string,
+     type: 'info' | 'success' | 'error',
+     actions?: Array<{ label: string; onClick: () => void; style?: 'primary' | 'danger' }>,
+   )
    ```
-   Albo nowa metoda `showAction(message, actions[])`.
+   Toast bez `actions` renderuje się jak dotąd; z `actions` pokazuje przyciski pod tekstem i **nie auto-zamyka się** (użytkownik musi kliknąć przycisk).
 
 3. `NotificationsMount.tsx` — obsłużyć `friend_request_received`:
    - Pokazać `RichToast` z przyciskami **Akceptuj** / **Odrzuć**.
@@ -209,8 +213,8 @@ async def _get_grace_period(self) -> int:
 - `backend/apps/accounts/consumers.py` — 2 nowe handlery.
 - `backend/apps/accounts/views.py` — `group_send` w `SendFriendRequestView` i `RespondFriendRequestView`.
 - `frontend/src/lib/useNotifications.ts` — rozszerzone typy.
-- `frontend/src/lib/ToastContext.tsx` — wsparcie akcji (lub nowy `RichToast`).
-- `frontend/src/components/Toast.tsx` lub nowy `ActionToast.tsx`.
+- `frontend/src/lib/ToastContext.tsx` — rozszerzyć `show()` o parametr `actions`.
+- `frontend/src/components/Toast.tsx` — render przycisków gdy `actions` są podane, wyłączyć auto-close w tym wariancie.
 - `frontend/src/lib/PendingRequestsContext.tsx` — nowy plik.
 - `frontend/src/app/layout.tsx` — owinąć w `PendingRequestsProvider`.
 - `frontend/src/components/Navbar.tsx` — użyć `usePendingRequests()`.
@@ -244,7 +248,7 @@ Usunąć też link do `/shop` po prawej stronie w header desktop + mobile.
 Nowy view `NextPublicTournamentView` w `rooms/views.py`. Logika:
 - Znajdź najbliższy aktywny konfig `PublicTournamentConfig` (wzorem istniejących views).
 - Jeśli istnieje aktywna/oczekująca publiczna gra (Room.is_public, status=LOBBY), zwróć jej dane wraz z polami wymaganymi przez frontend: `{room_id, start_time, player_count, max_players, seconds_until_start, interval_minutes, categories}`.
-- Brak danych → 204 No Content lub 200 z `null` (NIE 404 — bo to wtedy znów 404 w konsoli). Frontend interpretuje `!res.ok` jako brak.
+- Brak danych → **204 No Content** (NIE 404, bo to znów dałoby 404 w konsoli). Frontend interpretuje `!res.ok` jako brak i chowa banner.
 
 Dodać trasę w `rooms/urls.py`:
 ```python
