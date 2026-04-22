@@ -115,6 +115,24 @@ class GameConsumer(AsyncWebsocketConsumer):
     """
 
     GRACE_PERIOD_SECONDS = 30
+    LOBBY_GRACE_SECONDS = 3
+
+    @classmethod
+    async def _get_grace_period_for(cls, room_code: str) -> int:
+        """Zwraca grace period zależny od statusu pokoju.
+
+        LOBBY — krótki (3s), bo reconnect w lobby nie ma sensu i długa lista
+        „duchów" myli graczy. IN_PROGRESS — długi (30s), bo gracz może chcieć
+        wrócić po rozłączeniu w trakcie rundy.
+        """
+        from .models import Room
+        try:
+            room = await database_sync_to_async(Room.objects.get)(code=room_code)
+        except Room.DoesNotExist:
+            return cls.LOBBY_GRACE_SECONDS
+        if room.status == Room.Status.LOBBY:
+            return cls.LOBBY_GRACE_SECONDS
+        return cls.GRACE_PERIOD_SECONDS
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -145,17 +163,18 @@ class GameConsumer(AsyncWebsocketConsumer):
             self.room_code, self.nickname, close_code,
         )
         if self.nickname:
+            grace = await self._get_grace_period_for(self.room_code)
             key = (self.room_code, self.nickname)
             existing = _disconnect_tasks.get(key)
             if existing and not existing.done():
                 existing.cancel()
-            task = asyncio.create_task(self._delayed_player_left(key))
+            task = asyncio.create_task(self._delayed_player_left(key, grace))
             _disconnect_tasks[key] = task
         await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
-    async def _delayed_player_left(self, key: tuple[str, str]):
+    async def _delayed_player_left(self, key: tuple[str, str], grace_seconds: float):
         """Broadcast player_left po grace period, chyba że anulowany przez rejoin."""
-        await asyncio.sleep(self.GRACE_PERIOD_SECONDS)
+        await asyncio.sleep(grace_seconds)
         room_code, nickname = key
         _disconnect_tasks.pop(key, None)
         await self.channel_layer.group_send(f'room_{room_code}', {
