@@ -383,6 +383,13 @@ export const translations = {
 
     // Pack validation
     pack_name_required: 'Nazwa paczki jest wymagana',
+
+    // Tryby gry — tooltips
+    mode_ai_tooltip: 'Pytania generowane przez AI (Gemini) na żywo z podanych kategorii.',
+    mode_pack_tooltip: 'Własna paczka pytań stworzona przez Ciebie lub społeczność.',
+    mode_classic_tooltip: '5–20 rund. Punkty za szybkość i serię poprawnych odpowiedzi.',
+    mode_duel_tooltip: 'Szybki mecz 1v1 na 5 rund. Zwycięzca dostaje bonus 50 monet.',
+    mode_survival_tooltip: 'Jedna błędna odpowiedź eliminuje. Grasz do ostatniego gracza.',
   },
   en: {
     // Navigation
@@ -766,6 +773,13 @@ export const translations = {
 
     // Pack validation
     pack_name_required: 'Pack name is required',
+
+    // Game modes — tooltips
+    mode_ai_tooltip: 'Questions generated live by AI (Gemini) from your chosen categories.',
+    mode_pack_tooltip: 'A custom question pack created by you or the community.',
+    mode_classic_tooltip: '5–20 rounds. Points for speed and correct-answer streaks.',
+    mode_duel_tooltip: 'Fast 1v1 match over 5 rounds. Winner gets a 50-coin bonus.',
+    mode_survival_tooltip: 'One wrong answer eliminates you. Play until one player remains.',
   },
 } as const;
 
