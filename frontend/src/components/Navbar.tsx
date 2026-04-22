@@ -28,32 +28,25 @@ const GROUP_DEFS: GroupDef[] = [
     key: 'play',
     labelKey: 'nav_play',
     items: [
-      { href: '/dashboard',   labelKey: 'nav_dashboard'   },
-      { href: '/create',      labelKey: 'nav_create'      },
-      { href: '/join',        labelKey: 'nav_join'        },
-      { href: '/matchmaking', labelKey: 'nav_matchmaking' },
-      { href: '/survival',    labelKey: 'nav_survival'    },
+      { href: '/dashboard', labelKey: 'nav_dashboard' },
+      { href: '/create',    labelKey: 'nav_create'    },
+      { href: '/join',      labelKey: 'nav_join'      },
     ],
   },
   {
     key: 'community',
     labelKey: 'nav_community',
     items: [
-      { href: '/friends',     labelKey: 'nav_friends'     },
-      { href: '/clans',       labelKey: 'nav_clans'       },
-      { href: '/tournaments', labelKey: 'nav_tournaments' },
-      { href: '/ranking',     labelKey: 'nav_ranking'     },
+      { href: '/friends', labelKey: 'nav_friends' },
+      { href: '/ranking', labelKey: 'nav_ranking' },
     ],
   },
   {
     key: 'my',
     labelKey: 'nav_my',
     items: [
-      { href: '/profile',      labelKey: 'nav_profile'      },
-      { href: '/stats',        labelKey: 'nav_stats'        },
-      { href: '/history',      labelKey: 'nav_history'      },
-      { href: '/achievements', labelKey: 'nav_achievements' },
-      { href: '/packs',        labelKey: 'nav_packs'        },
+      { href: '/profile', labelKey: 'nav_profile' },
+      { href: '/history', labelKey: 'nav_history' },
     ],
   },
 ];
@@ -223,16 +216,6 @@ export default function Navbar() {
                 t={t}
               />
             ))}
-            <Link
-              href="/shop"
-              className={`text-sm py-1 px-2 rounded-lg transition-colors ${
-                pathname === '/shop'
-                  ? 'text-yellow-400 font-semibold'
-                  : 'text-white/70 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {t('nav_shop')}
-            </Link>
           </div>
 
           {/* Desktop right: lang + avatar + logout */}
@@ -363,18 +346,6 @@ export default function Navbar() {
                 );
               })}
 
-              {/* Shop direct */}
-              <Link
-                href="/shop"
-                onClick={() => setMobileOpen(false)}
-                className={`block px-3 py-2.5 rounded-lg font-medium transition-colors ${
-                  pathname === '/shop'
-                    ? 'text-yellow-400 bg-yellow-400/10'
-                    : 'text-white/80 hover:bg-white/5'
-                }`}
-              >
-                {t('nav_shop')}
-              </Link>
             </div>
           </div>
 

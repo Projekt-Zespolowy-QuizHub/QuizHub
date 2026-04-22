@@ -3,6 +3,7 @@ from .views import (
     CreateRoomView, JoinRoomView, RoomDetailView, RoomHistoryView,
     RoomReplayView, NextPublicGameView,
     PublicTournamentConfigView, TriggerPublicTournamentView,
+    NextPublicTournamentView,
     PackListView, PackCreateView, PackDetailView,
     PackQuestionCreateView, PackQuestionDetailView,
 )
@@ -17,6 +18,7 @@ urlpatterns = [
     # Public tournaments
     path('tournaments/config/', PublicTournamentConfigView.as_view(), name='tournament-config'),
     path('tournaments/trigger/', TriggerPublicTournamentView.as_view(), name='tournament-trigger'),
+    path('tournaments/next-public/', NextPublicTournamentView.as_view(), name='next-public-tournament'),
     # Question packs
     path('packs/', PackListView.as_view(), name='pack-list'),
     path('packs/create/', PackCreateView.as_view(), name='pack-create'),
