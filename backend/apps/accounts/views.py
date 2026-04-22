@@ -13,7 +13,7 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, inline_serializer
 from rest_framework import serializers as drf_serializers
 
-from .serializers import RegisterSerializer, LoginSerializer, UserProfileSerializer, ClanListSerializer, ClanDetailSerializer, ClanInviteSerializer
+from .serializers import RegisterSerializer, LoginSerializer, UserProfileSerializer, ClanListSerializer, ClanDetailSerializer
 from .models import UserProfile, Friendship, Achievement, UserAchievement, Challenge, Season, SeasonResult, Clan, ClanMembership, ClanInvite, DailyChallenge, UserChallengeProgress, ShopItem, UserItem, AVATAR_CHOICES, AVATAR_EMOJI
 from .achievements import ensure_achievements_exist
 from quizarena.throttles import AuthRateThrottle

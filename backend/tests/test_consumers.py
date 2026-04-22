@@ -5,7 +5,7 @@ from channels.testing import WebsocketCommunicator
 from channels.db import database_sync_to_async
 from quizarena.asgi import application
 from apps.rooms.models import Room, Player
-from apps.rooms.consumers import GameConsumer, _disconnect_tasks
+from apps.rooms.consumers import GameConsumer, _disconnect_tasks, _powerups_used, _double_points_active
 
 
 @pytest.fixture(autouse=True)
@@ -117,6 +117,8 @@ async def test_rejoin_cancels_grace_period_and_returns_game_state(room, short_gr
     await observer.disconnect()
 
 
+# ─── Testy per-status grace period ────────────────────────────────────────────
+
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
 async def test_grace_period_is_short_for_lobby_rooms():
@@ -145,3 +147,105 @@ async def test_grace_period_falls_back_when_room_missing():
     """Gdy pokój nie istnieje — stosujemy krótki grace (nie crashujemy)."""
     grace = await GameConsumer._get_grace_period_for('NOEXIS')
     assert grace <= 5
+
+
+# ─── Fixtures dla power-upów ──────────────────────────────────────────────────
+
+@pytest_asyncio.fixture
+async def clear_powerup_state():
+    _powerups_used.clear()
+    _double_points_active.clear()
+    yield
+    _powerups_used.clear()
+    _double_points_active.clear()
+
+
+# ─── Testy chat_message ───────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_chat_message_broadcast(room):
+    """chat_message jest rozsyłany do wszystkich w pokoju."""
+    alice = await _connect_and_join(room.code, 'Alice')
+    await alice.receive_json_from()  # własny player_joined
+
+    bob = await _connect_and_join(room.code, 'Bob')
+    await alice.receive_json_from()  # player_joined Bob
+    await bob.receive_json_from()    # własny player_joined (Bob)
+
+    await alice.send_json_to({'type': 'chat_message', 'text': 'Cześć!'})
+
+    alice_msg = await asyncio.wait_for(alice.receive_json_from(), timeout=1.0)
+    assert alice_msg == {'type': 'chat_message', 'nickname': 'Alice', 'text': 'Cześć!'}
+
+    bob_msg = await asyncio.wait_for(bob.receive_json_from(), timeout=1.0)
+    assert bob_msg == {'type': 'chat_message', 'nickname': 'Alice', 'text': 'Cześć!'}
+
+    await alice.disconnect()
+    await bob.disconnect()
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_chat_message_max_length(room):
+    """Wiadomości dłuższe niż 200 znaków są skracane."""
+    player = await _connect_and_join(room.code, 'Player')
+    await player.receive_json_from()
+
+    long_text = 'x' * 300
+    await player.send_json_to({'type': 'chat_message', 'text': long_text})
+
+    msg = await asyncio.wait_for(player.receive_json_from(), timeout=1.0)
+    assert len(msg['text']) == 200
+
+    await player.disconnect()
+
+
+# ─── Testy power-upów ─────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_powerup_extra_time(room, clear_powerup_state):
+    """extra_time power-up odsyła powerup_result z extra_seconds."""
+    player = await _connect_and_join(room.code, 'Player')
+    await player.receive_json_from()
+
+    await player.send_json_to({
+        'type': 'use_powerup',
+        'powerup': 'extra_time',
+        'nickname': 'Player',
+        'round_number': 1,
+    })
+
+    msg = await asyncio.wait_for(player.receive_json_from(), timeout=1.0)
+    assert msg == {'type': 'powerup_result', 'powerup': 'extra_time', 'extra_seconds': 15}
+
+    await player.disconnect()
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_powerup_cannot_use_twice(room, clear_powerup_state):
+    """Power-up można użyć tylko raz per grę."""
+    player = await _connect_and_join(room.code, 'Player')
+    await player.receive_json_from()
+
+    await player.send_json_to({
+        'type': 'use_powerup',
+        'powerup': 'extra_time',
+        'nickname': 'Player',
+        'round_number': 1,
+    })
+    msg = await asyncio.wait_for(player.receive_json_from(), timeout=1.0)
+    assert msg['type'] == 'powerup_result'
+
+    # Drugi raz — brak odpowiedzi
+    await player.send_json_to({
+        'type': 'use_powerup',
+        'powerup': 'extra_time',
+        'nickname': 'Player',
+        'round_number': 1,
+    })
+    assert await player.receive_nothing(timeout=0.2)
+
+    await player.disconnect()

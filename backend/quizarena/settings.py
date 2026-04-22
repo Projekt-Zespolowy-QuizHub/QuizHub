@@ -21,6 +21,7 @@ def _check_redis(url: str) -> bool:
     except Exception:
         return False
 
+
 INSTALLED_APPS = [
     'daphne',
     'django.contrib.admin',

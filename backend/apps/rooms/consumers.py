@@ -8,7 +8,7 @@ from apps.ai.generator import QuestionGenerator, get_category_for_round
 from apps.game.logic import calculate_points, get_streak_multiplier
 from quizarena.throttles import WebSocketConnectThrottle
 from .constants import (
-    MIN_PLAYERS_AUTO_START, EXTRA_TIME_SECONDS, CHAT_MAX_LENGTH,
+    MIN_PLAYERS_AUTO_START, EXTRA_TIME_SECONDS,
 )
 from .validators import (
     validate_message_type, validate_nickname, validate_chat_message,
