@@ -23,23 +23,44 @@ interface Props {
 }
 
 export function ToastItem({ toast, onClose }: Props) {
+  const hasActions = !!toast.actions && toast.actions.length > 0;
   return (
     <div
       className={clsx(
-        'flex items-center gap-3 px-4 py-3 rounded-xl border text-white text-sm font-medium',
-        'shadow-lg animate-fade-in-up backdrop-blur-sm',
+        'flex flex-col gap-2 px-4 py-3 rounded-xl border text-white text-sm font-medium',
+        'shadow-lg animate-fade-in-up backdrop-blur-sm max-w-sm',
         STYLES[toast.type],
       )}
     >
-      <span className="flex-shrink-0 font-bold">{ICONS[toast.type]}</span>
-      <span className="flex-1 leading-snug">{toast.message}</span>
-      <button
-        onClick={() => onClose(toast.id)}
-        className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity ml-1 text-base leading-none"
-        aria-label="Zamknij"
-      >
-        ✕
-      </button>
+      <div className="flex items-center gap-3">
+        <span className="flex-shrink-0 font-bold">{ICONS[toast.type]}</span>
+        <span className="flex-1 leading-snug">{toast.message}</span>
+        <button
+          onClick={() => onClose(toast.id)}
+          className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity ml-1 text-base leading-none"
+          aria-label="Zamknij"
+        >
+          ✕
+        </button>
+      </div>
+      {hasActions && (
+        <div className="flex gap-2 justify-end">
+          {toast.actions!.map((action, i) => (
+            <button
+              key={i}
+              onClick={() => { action.onClick(); onClose(toast.id); }}
+              className={clsx(
+                'px-3 py-1 rounded-md text-xs font-semibold transition-colors',
+                action.style === 'danger'
+                  ? 'bg-white/10 hover:bg-white/20 text-white'
+                  : 'bg-white text-black hover:bg-white/90',
+              )}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

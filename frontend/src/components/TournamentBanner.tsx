@@ -39,7 +39,7 @@ export default function TournamentBanner() {
   const fetchData = async () => {
     try {
       const res = await fetch('/api/tournaments/next-public/', { cache: 'no-store' });
-      if (!res.ok) {
+      if (!res.ok || res.status === 204) {
         setData(null);
         return;
       }

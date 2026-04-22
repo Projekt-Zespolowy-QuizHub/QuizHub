@@ -9,7 +9,22 @@ export interface ChallengeNotification {
   from_display_name: string;
 }
 
-type NotificationMessage = ChallengeNotification;
+export interface FriendRequestReceivedNotification {
+  type: 'friend_request_received';
+  request_id: number;
+  from_display_name: string;
+  from_user_id: number;
+}
+
+export interface FriendRequestAcceptedNotification {
+  type: 'friend_request_accepted';
+  by_display_name: string;
+}
+
+export type NotificationMessage =
+  | ChallengeNotification
+  | FriendRequestReceivedNotification
+  | FriendRequestAcceptedNotification;
 
 type OnMessageFn = (msg: NotificationMessage) => void;
 

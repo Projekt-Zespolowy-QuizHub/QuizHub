@@ -549,6 +549,51 @@ class NextPublicGameView(APIView):
         })
 
 
+class NextPublicTournamentView(APIView):
+    """
+    GET /api/tournaments/next-public/
+    Alias dla bannera turniejowego — 204 No Content gdy brak zaplanowanego turnieju.
+    """
+
+    @extend_schema(
+        summary='Następny publiczny turniej (dla banera)',
+        description='Zwraca dane najbliższego zaplanowanego turnieju publicznego lub 204 gdy brak.',
+        responses={
+            200: inline_serializer('NextPublicTournament', fields={
+                'room_id': drf_serializers.CharField(),
+                'start_time': drf_serializers.CharField(),
+                'player_count': drf_serializers.IntegerField(),
+                'max_players': drf_serializers.IntegerField(),
+                'seconds_until_start': drf_serializers.IntegerField(),
+                'interval_minutes': drf_serializers.IntegerField(),
+                'categories': drf_serializers.ListField(child=drf_serializers.CharField()),
+            }),
+            204: None,
+        },
+        tags=['tournaments'],
+    )
+    def get(self, request):
+        now = timezone.now()
+        game = Room.objects.filter(
+            is_public=True,
+            status=Room.Status.LOBBY,
+            scheduled_at__gt=now,
+        ).order_by('scheduled_at').first()
+        if not game:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        config = PublicTournamentConfig.get()
+        seconds_until_start = max(0, int((game.scheduled_at - now).total_seconds()))
+        return Response({
+            'room_id': game.code,
+            'start_time': game.scheduled_at.isoformat(),
+            'player_count': game.players.count(),
+            'max_players': config.max_players,
+            'seconds_until_start': seconds_until_start,
+            'interval_minutes': config.interval_minutes,
+            'categories': game.categories,
+        })
+
+
 class PublicTournamentConfigView(APIView):
     """GET/PATCH /api/tournaments/config/ — konfiguracja turniejów publicznych."""
 
