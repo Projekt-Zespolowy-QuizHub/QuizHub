@@ -6,6 +6,7 @@ import { api, Friend, PendingRequest, SearchResult } from '@/lib/api';
 import { useToast } from '@/lib/ToastContext';
 import { useAuth } from '@/lib/AuthProvider';
 import { useLocale } from '@/lib/LocaleContext';
+import { usePendingRequests } from '@/lib/PendingRequestsContext';
 
 interface Props {
   initialFriends: Friend[];
@@ -17,6 +18,7 @@ export default function FriendsClient({ initialFriends, initialPending }: Props)
   const { show } = useToast();
   const { user } = useAuth();
   const { t } = useLocale();
+  const { decrement: decrementPending } = usePendingRequests();
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [friends, setFriends] = useState(initialFriends);
@@ -71,6 +73,7 @@ export default function FriendsClient({ initialFriends, initialPending }: Props)
     try {
       await api.respondFriendRequest(requestId, action);
       setPending(prev => prev.filter(r => r.id !== requestId));
+      decrementPending();
       if (action === 'accept') {
         show(t('friends_invite_accepted'), 'success');
         const updated = await api.getFriends();

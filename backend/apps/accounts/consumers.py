@@ -46,3 +46,17 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             'type': 'challenge_cancelled',
             'challenge_id': event['challenge_id'],
         }))
+
+    async def friend_request_received(self, event):
+        await self.send(json.dumps({
+            'type': 'friend_request_received',
+            'request_id': event['request_id'],
+            'from_display_name': event['from_display_name'],
+            'from_user_id': event['from_user_id'],
+        }))
+
+    async def friend_request_accepted(self, event):
+        await self.send(json.dumps({
+            'type': 'friend_request_accepted',
+            'by_display_name': event['by_display_name'],
+        }))

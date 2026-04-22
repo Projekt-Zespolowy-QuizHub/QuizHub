@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthProvider';
 import { useEffect, useRef, useState } from 'react';
-import { api } from '@/lib/api';
 import { useLocale } from '@/lib/LocaleContext';
+import { usePendingRequests } from '@/lib/PendingRequestsContext';
 import LanguageSwitcher from './LanguageSwitcher';
 import { TranslationKey } from '@/lib/i18n';
 import { getAvatarEmoji } from '@/lib/avatars';
@@ -142,17 +142,10 @@ export default function Navbar() {
   const { user, logout, loading } = useAuth();
   const { t } = useLocale();
 
-  const [pendingCount, setPendingCount] = useState(0);
+  const { count: pendingCount } = usePendingRequests();
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    api.getPendingRequests()
-      .then(p => setPendingCount(p.length))
-      .catch(() => {});
-  }, [user, pathname]);
 
   useEffect(() => {
     setOpenGroup(null);

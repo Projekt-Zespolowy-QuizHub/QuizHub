@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { AuthProvider } from "@/lib/AuthProvider";
 import { ToastProvider } from "@/lib/ToastContext";
+import { PendingRequestsProvider } from "@/lib/PendingRequestsContext";
 import { ToastContainer } from "@/components/ToastContainer";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import NotificationsMount from "@/components/NotificationsMount";
@@ -30,11 +31,13 @@ export default function RootLayout({
           <LocaleProvider>
             <AuthProvider>
               <ToastProvider>
-                <TournamentBanner />
-                <Navbar />
-                <NotificationsMount />
-                <main className="max-w-5xl mx-auto px-4 py-4 sm:py-6">{children}</main>
-                <ToastContainer />
+                <PendingRequestsProvider>
+                  <TournamentBanner />
+                  <Navbar />
+                  <NotificationsMount />
+                  <main className="max-w-5xl mx-auto px-4 py-4 sm:py-6">{children}</main>
+                  <ToastContainer />
+                </PendingRequestsProvider>
               </ToastProvider>
             </AuthProvider>
           </LocaleProvider>

@@ -4,41 +4,101 @@ import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthProvider';
 import { useToast } from '@/lib/ToastContext';
-import { useNotifications, ChallengeNotification } from '@/lib/useNotifications';
+import {
+  useNotifications,
+  NotificationMessage,
+} from '@/lib/useNotifications';
+import { usePendingRequests } from '@/lib/PendingRequestsContext';
 import { api } from '@/lib/api';
 
-/**
- * Montuje WS powiadomień i obsługuje przychodzące wyzwania.
- * Renderuj tylko gdy user jest zalogowany.
- */
 function NotificationsListener() {
   const router = useRouter();
   const { show } = useToast();
+  const { increment, decrement } = usePendingRequests();
 
-  const handleMessage = useCallback(async (msg: ChallengeNotification) => {
-    if (msg.type !== 'challenge_received') return;
-
-    const { challenge_id, from_display_name } = msg;
-
-    // Pokaż toast z przyciskami akcji — używamy confirm jako fallback
-    const accepted = window.confirm(
-      `${from_display_name} wyzwał(a) Cię na pojedynek! Zaakceptować wyzwanie?`
-    );
-
-    try {
-      const res = await api.respondChallenge(challenge_id, accepted ? 'accept' : 'decline');
-      if (accepted && res.room_code) {
-        show('Wyzwanie zaakceptowane! Dołączasz do pokoju...', 'success');
-        const nickname = (await api.me()).display_name;
-        sessionStorage.setItem(`nick_${res.room_code}`, nickname);
-        router.push(`/room/${res.room_code}/lobby`);
-      } else {
-        show('Wyzwanie odrzucone', 'info');
-      }
-    } catch {
-      show('Błąd odpowiedzi na wyzwanie', 'error');
+  const handleMessage = useCallback(async (msg: NotificationMessage) => {
+    if (msg.type === 'challenge_received') {
+      const { challenge_id, from_display_name } = msg;
+      show(
+        `${from_display_name} wyzwał(a) Cię na pojedynek!`,
+        'info',
+        [
+          {
+            label: 'Akceptuj',
+            style: 'primary',
+            onClick: async () => {
+              try {
+                const res = await api.respondChallenge(challenge_id, 'accept');
+                if (res.room_code) {
+                  const me = await api.me();
+                  sessionStorage.setItem(`nick_${res.room_code}`, me.display_name);
+                  router.push(`/room/${res.room_code}/lobby`);
+                }
+              } catch {
+                show('Błąd odpowiedzi na wyzwanie', 'error');
+              }
+            },
+          },
+          {
+            label: 'Odrzuć',
+            style: 'danger',
+            onClick: async () => {
+              try {
+                await api.respondChallenge(challenge_id, 'decline');
+                show('Wyzwanie odrzucone', 'info');
+              } catch {
+                show('Błąd odpowiedzi na wyzwanie', 'error');
+              }
+            },
+          },
+        ],
+      );
+      return;
     }
-  }, [router, show]);
+
+    if (msg.type === 'friend_request_received') {
+      const { request_id, from_display_name } = msg;
+      increment();
+      show(
+        `${from_display_name} chce dodać Cię do znajomych`,
+        'info',
+        [
+          {
+            label: 'Akceptuj',
+            style: 'primary',
+            onClick: async () => {
+              try {
+                await api.respondFriendRequest(request_id, 'accept');
+                decrement();
+                show('Zaproszenie zaakceptowane', 'success');
+              } catch {
+                show('Błąd akceptacji zaproszenia', 'error');
+              }
+            },
+          },
+          {
+            label: 'Odrzuć',
+            style: 'danger',
+            onClick: async () => {
+              try {
+                await api.respondFriendRequest(request_id, 'reject');
+                decrement();
+                show('Zaproszenie odrzucone', 'info');
+              } catch {
+                show('Błąd odrzucenia zaproszenia', 'error');
+              }
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    if (msg.type === 'friend_request_accepted') {
+      show(`${msg.by_display_name} zaakceptował(a) Twoje zaproszenie`, 'success');
+      return;
+    }
+  }, [router, show, increment, decrement]);
 
   useNotifications(handleMessage);
   return null;
