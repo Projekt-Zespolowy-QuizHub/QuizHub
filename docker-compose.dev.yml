@@ -35,6 +35,11 @@ services:
     environment:
       DEBUG: "True"
       DB_ENGINE: postgresql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: quizarena
+      DB_USER: quizarena
+      DB_PASSWORD: quizarena_dev
       REDIS_URL: redis://redis:6379
     volumes:
       - ./backend:/app
