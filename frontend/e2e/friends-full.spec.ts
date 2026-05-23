@@ -1,23 +1,41 @@
 import { test, expect } from '@playwright/test';
-import { mockAuth, mockUnauthenticated, MOCK_USER } from './helpers';
+import { mockAuth } from './helpers';
 
-test.describe('Znajomi — pełny przepływ', () => {
+test.describe('Znajomi - pelny przeplyw', () => {
   test.beforeEach(async ({ page }) => {
     await mockAuth(page);
   });
 
-  test.describe('Sekcja oczekujących zaproszeń', () => {
-    test('sekcja oczekujących zaproszeń jest widoczna na stronie', async ({ page }) => {
+  test.describe('Sekcja oczekujacych zaproszen', () => {
+    test('sekcja oczekujacych zaproszen jest widoczna na stronie', async ({ page }) => {
+      await page.route('**/api/friends/', async route => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([]),
+        });
+      });
+      await page.route('**/api/friends/pending/', async route => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([]),
+        });
+      });
+
       await page.goto('/friends');
 
-      // Sekcja powinna być widoczna nawet gdy jest pusta
       await expect(page.getByText('Zaproszenia')).toBeVisible();
+      await expect(page.getByText(/Brak zaprosze/)).toBeVisible();
     });
 
-    test('przyjęcie zaproszenia wywołuje endpoint respond i aktualizuje widok', async ({ page }) => {
+    test('przyjecie zaproszenia pobiera pending klientowo i odswieza stan po akceptacji', async ({ page }) => {
+      let requestAccepted = false;
       let respondCalled = false;
+
       await page.route('**/api/friends/respond/', async route => {
         respondCalled = true;
+        requestAccepted = true;
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -29,28 +47,43 @@ test.describe('Znajomi — pełny przepływ', () => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify([
-            { id: 3, display_name: 'NowyZnajomy', total_score: 500 },
-          ]),
+          body: JSON.stringify(
+            requestAccepted
+              ? [{ id: 3, display_name: 'NowyZnajomy', total_score: 500 }]
+              : []
+          ),
+        });
+      });
+
+      await page.route('**/api/friends/pending/', async route => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            requestAccepted
+              ? []
+              : [{ id: 91, from_display_name: 'NowyZnajomy' }]
+          ),
         });
       });
 
       await page.goto('/friends');
 
-      // Kliknij "Akceptuj" jeśli jest widoczny (tylko gdy SSR zwróci pending requests)
-      const acceptButton = page.getByRole('button', { name: /Akceptuj/i });
-      const acceptVisible = await acceptButton.isVisible().catch(() => false);
-      if (acceptVisible) {
-        await acceptButton.first().click();
-        expect(respondCalled).toBe(true);
-      } else {
-        // Sekcja oczekujących jest widoczna, ale pusta — SSR nie zwróciło danych
-        await expect(page.getByText('Zaproszenia')).toBeVisible();
-      }
+      await expect(page.getByText(/Zaproszenia\s*\(1\)/)).toBeVisible();
+      await expect(page.getByText('NowyZnajomy')).toBeVisible();
+
+      await page.getByRole('button', { name: /Akceptuj/i }).click();
+
+      expect(respondCalled).toBe(true);
+      await expect(page.getByText(/Zaproszenia\s*\(0\)/)).toBeVisible();
+      await expect(page.getByText(/Brak zaprosze/)).toBeVisible();
+      await expect(page.getByText('Lista znajomych')).toBeVisible();
+      await expect(page.getByText('NowyZnajomy')).toBeVisible();
     });
 
-    test('odrzucenie zaproszenia wywołuje endpoint respond z action=reject', async ({ page }) => {
+    test('odrzucenie zaproszenia wywoluje endpoint respond z action=reject', async ({ page }) => {
       let respondBody: string | null = null;
+
       await page.route('**/api/friends/respond/', async route => {
         respondBody = route.request().postData();
         await route.fulfill({
@@ -60,38 +93,49 @@ test.describe('Znajomi — pełny przepływ', () => {
         });
       });
 
-      await page.goto('/friends');
+      await page.route('**/api/friends/pending/', async route => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([{ id: 92, from_display_name: 'DoOdrzucenia' }]),
+        });
+      });
 
-      const rejectButton = page.getByRole('button', { name: /Odrzuc/i });
-      const rejectVisible = await rejectButton.isVisible().catch(() => false);
-      if (rejectVisible) {
-        await rejectButton.first().click();
-        // Sprawdź że odpowiedź zawiera reject
-        if (respondBody) {
-          expect(respondBody as string).toContain('reject');
-        }
-      } else {
-        // Brak pending requests w środowisku testowym — test SSR ominięty
-        await expect(page.getByText('Zaproszenia')).toBeVisible();
-      }
+      await page.goto('/friends');
+      await expect(page.getByText('DoOdrzucenia')).toBeVisible();
+
+      await page.getByRole('button', { name: /Odrzu/i }).click();
+
+      expect(respondBody).toContain('reject');
     });
 
-    test('pusta sekcja oczekujących zaproszeń nie pokazuje mylącego UI', async ({ page }) => {
+    test('pusta sekcja oczekujacych zaproszen nie pokazuje mylacego UI', async ({ page }) => {
+      await page.route('**/api/friends/', async route => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([]),
+        });
+      });
+      await page.route('**/api/friends/pending/', async route => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([]),
+        });
+      });
+
       await page.goto('/friends');
 
-      // Nie powinno być widocznych przycisków Akceptuj/Odrzuc bez danych
-      const acceptButtons = page.getByRole('button', { name: /Akceptuj/i });
-      const count = await acceptButtons.count();
-      // Przy pustej liście pending liczba przycisków to 0
-      expect(count).toBeGreaterThanOrEqual(0);
-
-      // Strona powinna się załadować bez błędów
       await expect(page.getByText('Znajomi')).toBeVisible();
+      await expect(page.getByText(/Zaproszenia\s*\(0\)/)).toBeVisible();
+      await expect(page.getByText(/Brak zaprosze/)).toBeVisible();
+      await expect(page.getByRole('button', { name: /Akceptuj/i })).toHaveCount(0);
     });
   });
 
-  test.describe('Wyszukiwanie użytkowników', () => {
-    test('wynik wyszukiwania pokazuje badge "Dodaj" dla nowego użytkownika', async ({ page }) => {
+  test.describe('Wyszukiwanie uzytkownikow', () => {
+    test('wynik wyszukiwania pokazuje badge "Dodaj" dla nowego uzytkownika', async ({ page }) => {
       await page.route('**/api/friends/search/**', async route => {
         await route.fulfill({
           status: 200,
@@ -103,14 +147,14 @@ test.describe('Znajomi — pełny przepływ', () => {
       });
 
       await page.goto('/friends');
-      await page.getByPlaceholder('Wyszukaj uzytkownika').fill('Nowy');
+      await page.getByPlaceholder(/Wyszukaj/).fill('Nowy');
       await page.getByRole('button', { name: 'Szukaj' }).click();
 
       await expect(page.getByText('NowyGracz')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Dodaj' })).toBeVisible();
     });
 
-    test('wynik wyszukiwania pokazuje badge "Znajomy" dla istniejącego znajomego', async ({ page }) => {
+    test('wynik wyszukiwania pokazuje badge "Znajomy" dla istniejacego znajomego', async ({ page }) => {
       await page.route('**/api/friends/search/**', async route => {
         await route.fulfill({
           status: 200,
@@ -122,30 +166,30 @@ test.describe('Znajomi — pełny przepływ', () => {
       });
 
       await page.goto('/friends');
-      await page.getByPlaceholder('Wyszukaj uzytkownika').fill('Istniejacy');
+      await page.getByPlaceholder(/Wyszukaj/).fill('Istniejacy');
       await page.getByRole('button', { name: 'Szukaj' }).click();
 
       await expect(page.getByText('IstniejacyZnajomy')).toBeVisible();
-      // Powinien być widoczny tekst "Znajomy" zamiast przycisku "Dodaj"
-      await expect(page.getByText('Znajomy')).toBeVisible();
+      await expect(page.getByText('Znajomy', { exact: true })).toBeVisible();
     });
 
     test('wyszukiwanie z 1 znakiem nie uruchamia zapytania API', async ({ page }) => {
       let searchCalled = false;
+
       await page.route('**/api/friends/search/**', async route => {
         searchCalled = true;
         await route.continue();
       });
 
       await page.goto('/friends');
-      await page.getByPlaceholder('Wyszukaj uzytkownika').fill('A');
+      await page.getByPlaceholder(/Wyszukaj/).fill('A');
       await page.getByRole('button', { name: 'Szukaj' }).click();
 
       await page.waitForTimeout(300);
       expect(searchCalled).toBe(false);
     });
 
-    test('wyszukiwanie zwraca wiele wyników naraz', async ({ page }) => {
+    test('wyszukiwanie zwraca wiele wynikow naraz', async ({ page }) => {
       await page.route('**/api/friends/search/**', async route => {
         await route.fulfill({
           status: 200,
@@ -159,7 +203,7 @@ test.describe('Znajomi — pełny przepływ', () => {
       });
 
       await page.goto('/friends');
-      await page.getByPlaceholder('Wyszukaj uzytkownika').fill('Gracz');
+      await page.getByPlaceholder(/Wyszukaj/).fill('Gracz');
       await page.getByRole('button', { name: 'Szukaj' }).click();
 
       await expect(page.getByText('GraczAlfa')).toBeVisible();
@@ -179,56 +223,45 @@ test.describe('Znajomi — pełny przepływ', () => {
           ]),
         });
       });
-
-      await page.route('**/api/friends/respond/', async route => {
+      await page.route('**/api/friends/pending/', async route => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ message: 'ok' }),
+          body: JSON.stringify([]),
         });
       });
 
       await page.goto('/friends');
 
-      // Sekcja znajomych jest zawsze widoczna
-      await expect(page.getByText('Twoi znajomi')).toBeVisible();
+      await expect(page.getByText('Lista znajomych')).toBeVisible();
+      await expect(page.getByText('2500 pkt')).toBeVisible();
     });
 
-    test('lista znajomych pokazuje nazwę / avatar użytkownika po akceptacji', async ({ page }) => {
+    test('pusta lista znajomych wyswietla informacje', async ({ page }) => {
       await page.route('**/api/friends/', async route => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify([
-            { id: 3, display_name: 'WeryfikowanyZnajomy', total_score: 1200, avatar: '🦊' },
-          ]),
+          body: JSON.stringify([]),
         });
       });
-
-      await page.route('**/api/friends/respond/', async route => {
+      await page.route('**/api/friends/pending/', async route => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ message: 'ok' }),
+          body: JSON.stringify([]),
         });
       });
 
       await page.goto('/friends');
 
-      // Sekcja listy znajomych jest renderowana
-      await expect(page.getByText('Twoi znajomi')).toBeVisible();
-    });
-
-    test('pusta lista znajomych wyświetla informację', async ({ page }) => {
-      await page.goto('/friends');
-
-      await expect(page.getByText('Twoi znajomi')).toBeVisible();
-      await expect(page.getByText('Brak znajomych — wyszukaj i dodaj!')).toBeVisible();
+      await expect(page.getByText('Lista znajomych')).toBeVisible();
+      await expect(page.getByText(/Brak znajomych/)).toBeVisible();
     });
   });
 
-  test.describe('Wysyłanie zaproszeń', () => {
-    test('kliknięcie "Dodaj" wysyła zaproszenie i usuwa gracza z wyników', async ({ page }) => {
+  test.describe('Wysylanie zaproszen', () => {
+    test('klikniecie "Dodaj" wysyla zaproszenie i usuwa gracza z wynikow', async ({ page }) => {
       await page.route('**/api/friends/search/**', async route => {
         await route.fulfill({
           status: 200,
@@ -249,7 +282,7 @@ test.describe('Znajomi — pełny przepływ', () => {
       });
 
       await page.goto('/friends');
-      await page.getByPlaceholder('Wyszukaj uzytkownika').fill('Gracz');
+      await page.getByPlaceholder(/Wyszukaj/).fill('Gracz');
       await page.getByRole('button', { name: 'Szukaj' }).click();
 
       await expect(page.getByText('GraczAlfa')).toBeVisible();
@@ -260,7 +293,7 @@ test.describe('Znajomi — pełny przepływ', () => {
     });
   });
 
-  test.describe('Nawigacja i wyszukiwanie przez klawiaturę', () => {
+  test.describe('Nawigacja i wyszukiwanie przez klawiature', () => {
     test('wyszukiwanie przez Enter uruchamia zapytanie', async ({ page }) => {
       await page.route('**/api/friends/search/**', async route => {
         await route.fulfill({
@@ -271,7 +304,7 @@ test.describe('Znajomi — pełny przepływ', () => {
       });
 
       await page.goto('/friends');
-      const input = page.getByPlaceholder('Wyszukaj uzytkownika');
+      const input = page.getByPlaceholder(/Wyszukaj/);
       await input.fill('Gracz');
       await input.press('Enter');
 
