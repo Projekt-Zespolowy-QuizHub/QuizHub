@@ -155,7 +155,6 @@ test.describe('Znajomi', () => {
 
   test('wyszukiwanie zbyt krotkiej frazy nie uruchamia zapytania', async ({ page }) => {
     let searchCalled = false;
-
     await page.route('**/api/friends/search/**', async route => {
       searchCalled = true;
       await route.continue();
