@@ -14,17 +14,17 @@ This is the production source of truth for `QuizHub`. It describes the real VPS,
 ## Deployment Source of Truth
 
 - Deployment branch: `deployment`
-- Current deployment target: `48f1efd9eaeab86732f965d7dd6c519541c015f1`
-- Rollback reference for the current release wave: `f8ed926ce56a92807e5d06e25d51566e9e19df3f`
+- Current deployment target: `09d6b22a9466327e08129d48f9231c7af22135ef`
+- Rollback reference for the current release wave: `dc5ab8618b0b5e6bbada690637fecbaba77141b8`
 - Rule: after every successful production deploy, update this file with the new production commit, the previous rollback commit, verification date, and operator.
 
 ## Current Production State
 
-- Current deployed commit: `f8ed926ce56a92807e5d06e25d51566e9e19df3f`
+- Current deployed commit: `09d6b22a9466327e08129d48f9231c7af22135ef`
 - Current deployed branch: `deployment`
 - Last verified date: `2026-05-23`
-- Last operator: `Codex via SSH inspection`
-- Migrations included: current production is still on commit `f8ed926`; the pending target `48f1efd` is a newer deployment branch state and has not been deployed yet.
+- Last operator: `Codex via SSH deploy and smoke validation`
+- Migrations included: `accounts.0010_shop_personalization` plus the shop/profile/power-up and production nginx routing fixes from the 2026-05-23 release wave.
 
 ## Server-Specific Values
 
@@ -112,7 +112,7 @@ git rev-parse HEAD
 Expected `HEAD` for the next deploy:
 
 ```text
-48f1efd9eaeab86732f965d7dd6c519541c015f1
+09d6b22a9466327e08129d48f9231c7af22135ef
 ```
 
 7. Build and start production:
