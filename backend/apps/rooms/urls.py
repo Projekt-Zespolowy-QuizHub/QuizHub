@@ -6,6 +6,7 @@ from .views import (
     NextPublicTournamentView,
     PackListView, PackCreateView, PackDetailView,
     PackQuestionCreateView, PackQuestionDetailView,
+    TournamentListView, TournamentDetailView, TournamentJoinView, TournamentLeaveView,
 )
 
 urlpatterns = [
@@ -15,10 +16,15 @@ urlpatterns = [
     path('rooms/<str:code>/', RoomDetailView.as_view(), name='room-detail'),
     path('rooms/<str:code>/history/', RoomHistoryView.as_view(), name='room-history'),
     path('rooms/<str:code>/replay/', RoomReplayView.as_view(), name='room-replay'),
-    # Public tournaments
+    # Public tournaments (scheduler config)
     path('tournaments/config/', PublicTournamentConfigView.as_view(), name='tournament-config'),
     path('tournaments/trigger/', TriggerPublicTournamentView.as_view(), name='tournament-trigger'),
     path('tournaments/next-public/', NextPublicTournamentView.as_view(), name='next-public-tournament'),
+    # User-created tournaments
+    path('tournaments/', TournamentListView.as_view(), name='tournament-list'),
+    path('tournaments/<int:pk>/', TournamentDetailView.as_view(), name='tournament-detail'),
+    path('tournaments/<int:pk>/join/', TournamentJoinView.as_view(), name='tournament-join'),
+    path('tournaments/<int:pk>/leave/', TournamentLeaveView.as_view(), name='tournament-leave'),
     # Question packs
     path('packs/', PackListView.as_view(), name='pack-list'),
     path('packs/create/', PackCreateView.as_view(), name='pack-create'),
