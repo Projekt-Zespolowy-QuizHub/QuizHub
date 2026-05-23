@@ -118,6 +118,68 @@ class Answer(models.Model):
         unique_together = ('player', 'question')
 
 
+class Tournament(models.Model):
+    """Turniej tworzony przez użytkownika — z kategorią, datami, nagrodą i uczestnikami."""
+
+    class Status(models.TextChoices):
+        UPCOMING = 'upcoming', 'Nadchodzący'
+        ACTIVE = 'active', 'Aktywny'
+        FINISHED = 'finished', 'Zakończony'
+
+    name = models.CharField(max_length=80)
+    description = models.TextField(blank=True)
+    icon = models.CharField(max_length=10, default='🏆')
+    category = models.CharField(max_length=50)
+    creator = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='tournaments_created')
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    max_participants = models.IntegerField(default=32)
+    prize_coins = models.IntegerField(default=0)
+    is_open = models.BooleanField(default=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.UPCOMING)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'tournaments'
+        ordering = ['-start_date']
+
+    def __str__(self):
+        return f'{self.name} ({self.status})'
+
+    def compute_status(self):
+        """Wylicza aktualny status na podstawie dat (nie zapisuje)."""
+        from django.utils import timezone as _tz
+        now = _tz.now()
+        if now < self.start_date:
+            return self.Status.UPCOMING
+        if now > self.end_date:
+            return self.Status.FINISHED
+        return self.Status.ACTIVE
+
+    def sync_status(self):
+        """Aktualizuje pole status na podstawie dat, zapisuje jeśli się zmieniło."""
+        new_status = self.compute_status()
+        if new_status != self.status:
+            self.status = new_status
+            self.save(update_fields=['status'])
+
+
+class TournamentParticipant(models.Model):
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name='participants')
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='tournament_participations')
+    score = models.IntegerField(default=0)
+    games_played = models.IntegerField(default=0)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'tournament_participants'
+        unique_together = ('tournament', 'user')
+        ordering = ['-score']
+
+    def __str__(self):
+        return f'{self.user} w {self.tournament.name}'
+
+
 class PublicTournamentConfig(models.Model):
     """Singleton — konfiguracja automatycznych turniejów publicznych."""
     interval_minutes = models.IntegerField(default=30, help_text='Co ile minut tworzony jest nowy turniej publiczny')

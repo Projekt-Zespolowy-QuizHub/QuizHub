@@ -4,15 +4,22 @@ import { createContext, useCallback, useContext, useRef, useState } from 'react'
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+  style?: 'primary' | 'danger';
+}
+
 export interface Toast {
   id: number;
   type: ToastType;
   message: string;
+  actions?: ToastAction[];
 }
 
 interface ToastContextValue {
   toasts: Toast[];
-  show: (message: string, type?: ToastType) => void;
+  show: (message: string, type?: ToastType, actions?: ToastAction[]) => number;
   hide: (id: number) => void;
 }
 
@@ -26,15 +33,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const hide = useCallback((id: number) => {
     setToasts(prev => prev.filter(t => t.id !== id));
-    clearTimeout(timers.current.get(id));
+    const timer = timers.current.get(id);
+    if (timer) clearTimeout(timer);
     timers.current.delete(id);
   }, []);
 
-  const show = useCallback((message: string, type: ToastType = 'info') => {
+  const show = useCallback((message: string, type: ToastType = 'info', actions?: ToastAction[]) => {
     const id = ++counter;
-    setToasts(prev => [...prev, { id, type, message }]);
-    const timer = setTimeout(() => hide(id), 3000);
-    timers.current.set(id, timer);
+    setToasts(prev => [...prev, { id, type, message, actions }]);
+    if (!actions || actions.length === 0) {
+      const timer = setTimeout(() => hide(id), 3000);
+      timers.current.set(id, timer);
+    }
+    return id;
   }, [hide]);
 
   return (

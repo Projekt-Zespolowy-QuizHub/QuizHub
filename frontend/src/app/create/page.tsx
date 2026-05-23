@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/lib/useRequireAuth';
 import { api, QuestionPack } from '@/lib/api';
 import { useLocale } from '@/lib/LocaleContext';
+import { InfoTooltip } from '@/components/InfoTooltip';
 
 export default function CreateGamePage() {
   const { user, loading: authLoading } = useRequireAuth();
@@ -71,20 +72,24 @@ export default function CreateGamePage() {
           {/* Tryb: AI vs paczka */}
           <label className="block text-white text-sm font-bold mb-3">{t('create_source')}</label>
           <div className="flex gap-2 mb-5">
-            <button
-              onClick={() => { setMode('ai'); setSelectedPackId(null); }}
-              className={`flex-1 rounded-xl py-2 text-sm font-bold transition ${mode === 'ai' ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
-            >
-              🤖 {t('create_ai')}
-            </button>
-            <button
-              onClick={() => { setMode('pack'); if (packs.length > 0) setSelectedPackId(packs[0].id); }}
-              className={`flex-1 rounded-xl py-2 text-sm font-bold transition ${mode === 'pack' ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
-              disabled={packs.length === 0}
-              title={packs.length === 0 ? t('create_no_packs') : undefined}
-            >
-              📦 {t('create_my_pack')}
-            </button>
+            <InfoTooltip content={t('mode_ai_tooltip')} className="flex-1">
+              <button
+                onClick={() => { setMode('ai'); setSelectedPackId(null); }}
+                className={`w-full rounded-xl py-2 text-sm font-bold transition ${mode === 'ai' ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
+              >
+                🤖 {t('create_ai')}
+              </button>
+            </InfoTooltip>
+            <InfoTooltip content={t('mode_pack_tooltip')} className="flex-1">
+              <button
+                onClick={() => { setMode('pack'); if (packs.length > 0) setSelectedPackId(packs[0].id); }}
+                className={`w-full rounded-xl py-2 text-sm font-bold transition ${mode === 'pack' ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
+                disabled={packs.length === 0}
+                title={packs.length === 0 ? t('create_no_packs') : undefined}
+              >
+                📦 {t('create_my_pack')}
+              </button>
+            </InfoTooltip>
           </div>
 
           {mode === 'ai' ? (
@@ -132,17 +137,24 @@ export default function CreateGamePage() {
           {/* Tryb gry */}
           <label className="block text-white text-sm font-bold mb-3 mt-4">Tryb gry</label>
           <div className="flex gap-2 mb-5">
-            {(['classic', 'duel', 'survival'] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setGameMode(m)}
-                className={`flex-1 rounded-xl py-2 text-sm font-bold transition ${gameMode === m ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
-              >
-                {m === 'classic' && '🎯 Klasyczny'}
-                {m === 'duel' && '⚔️ Pojedynek'}
-                {m === 'survival' && '💀 Przetrwanie'}
-              </button>
-            ))}
+            {(['classic', 'duel', 'survival'] as const).map((m) => {
+              const tooltipKey =
+                m === 'classic' ? 'mode_classic_tooltip'
+                : m === 'duel' ? 'mode_duel_tooltip'
+                : 'mode_survival_tooltip';
+              return (
+                <InfoTooltip key={m} content={t(tooltipKey)} className="flex-1">
+                  <button
+                    onClick={() => setGameMode(m)}
+                    className={`w-full rounded-xl py-2 text-sm font-bold transition ${gameMode === m ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
+                  >
+                    {m === 'classic' && '🎯 Klasyczny'}
+                    {m === 'duel' && '⚔️ Pojedynek'}
+                    {m === 'survival' && '💀 Przetrwanie'}
+                  </button>
+                </InfoTooltip>
+              );
+            })}
           </div>
 
           <label className="block text-white text-sm font-bold mt-4 mb-1">{t('create_rounds')}: {rounds}</label>

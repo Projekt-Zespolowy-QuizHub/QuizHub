@@ -8,8 +8,8 @@ from apps.rooms.models import Room, Player
 from apps.rooms.consumers import (
     GameConsumer,
     _disconnect_tasks,
-    _powerups_used,
     _double_points_active,
+    _powerups_used,
     _round_tasks,
 )
 
@@ -37,6 +37,7 @@ async def clear_disconnect_tasks():
 @pytest.fixture
 def short_grace(monkeypatch):
     monkeypatch.setattr(GameConsumer, 'GRACE_PERIOD_SECONDS', 0.05)
+    monkeypatch.setattr(GameConsumer, 'LOBBY_GRACE_SECONDS', 0.05)
 
 
 @pytest_asyncio.fixture
@@ -131,6 +132,38 @@ async def test_rejoin_cancels_grace_period_and_returns_game_state(room, short_gr
 
     await rejoined.disconnect()
     await observer.disconnect()
+
+
+# ─── Testy per-status grace period ────────────────────────────────────────────
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_grace_period_is_short_for_lobby_rooms():
+    """W pokoju w statusie LOBBY player_left ma wyjść szybko — nie 30s."""
+    room = await database_sync_to_async(Room.objects.create)(
+        code='GRCLB1', status=Room.Status.LOBBY,
+    )
+    grace = await GameConsumer._get_grace_period_for(room.code)
+    assert grace <= 5, f'Expected short lobby grace (≤5s), got {grace}s'
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_grace_period_is_long_for_in_progress_rooms():
+    """W pokoju w grze reconnect grace period zostaje długi (30s)."""
+    room = await database_sync_to_async(Room.objects.create)(
+        code='GRCIP1', status=Room.Status.IN_PROGRESS,
+    )
+    grace = await GameConsumer._get_grace_period_for(room.code)
+    assert grace == 30
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_grace_period_falls_back_when_room_missing():
+    """Gdy pokój nie istnieje — stosujemy krótki grace (nie crashujemy)."""
+    grace = await GameConsumer._get_grace_period_for('NOEXIS')
+    assert grace <= 5
 
 
 # ─── Fixtures dla power-upów ──────────────────────────────────────────────────
@@ -238,8 +271,6 @@ async def test_powerup_cannot_use_twice(room, clear_powerup_state):
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
 async def test_single_player_answer_advances_to_next_question(room, fast_rounds, monkeypatch):
-    from apps.rooms.models import Player
-
     room.total_rounds = 2
     await database_sync_to_async(room.save)()
     await database_sync_to_async(Player.objects.create)(room=room, nickname='Solo')
@@ -249,13 +280,13 @@ async def test_single_player_answer_advances_to_next_question(room, fast_rounds,
             'question': 'Pytanie 1?',
             'options': ['A1', 'B1', 'C1', 'D1'],
             'correct': 'A',
-            'explanation': 'Wyjaśnienie 1',
+            'explanation': 'Wyjasnienie 1',
         },
         {
             'question': 'Pytanie 2?',
             'options': ['A2', 'B2', 'C2', 'D2'],
             'correct': 'B',
-            'explanation': 'Wyjaśnienie 2',
+            'explanation': 'Wyjasnienie 2',
         },
     ])
 
@@ -265,7 +296,7 @@ async def test_single_player_answer_advances_to_next_question(room, fast_rounds,
     monkeypatch.setattr('apps.ai.generator.QuestionGenerator.generate', fake_generate)
 
     comm = await _connect_and_join(room.code, 'Solo')
-    await comm.receive_json_from()  # własny player_joined
+    await comm.receive_json_from()
 
     await comm.send_json_to({'type': 'start_game'})
     msg = await asyncio.wait_for(comm.receive_json_from(), timeout=1.0)

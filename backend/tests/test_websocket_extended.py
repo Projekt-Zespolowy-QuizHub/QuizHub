@@ -45,6 +45,7 @@ async def clear_tasks():
 @pytest.fixture
 def short_grace(monkeypatch):
     monkeypatch.setattr(GameConsumer, 'GRACE_PERIOD_SECONDS', 0.05)
+    monkeypatch.setattr(GameConsumer, 'LOBBY_GRACE_SECONDS', 0.05)
 
 
 @pytest_asyncio.fixture

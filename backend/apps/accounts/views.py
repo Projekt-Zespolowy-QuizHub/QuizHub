@@ -312,7 +312,22 @@ class SendFriendRequestView(APIView):
             models.Q(from_user=target_user, to_user=request.user)
         ).exists():
             return Response({'error': 'Request already exists'}, status=status.HTTP_400_BAD_REQUEST)
-        Friendship.objects.create(from_user=request.user, to_user=target_user)
+        friendship = Friendship.objects.create(from_user=request.user, to_user=target_user)
+
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        if channel_layer is not None:
+            async_to_sync(channel_layer.group_send)(
+                f'user_notifications_{target_user.id}',
+                {
+                    'type': 'friend_request_received',
+                    'request_id': friendship.id,
+                    'from_display_name': request.user.profile.display_name,
+                    'from_user_id': request.user.profile.id,
+                },
+            )
+
         return Response({'message': 'Request sent'}, status=status.HTTP_201_CREATED)
 
 
@@ -371,6 +386,19 @@ class RespondFriendRequestView(APIView):
         if request.data.get('action') == 'accept':
             friendship.status = Friendship.Status.ACCEPTED
             friendship.save()
+
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            channel_layer = get_channel_layer()
+            if channel_layer is not None:
+                async_to_sync(channel_layer.group_send)(
+                    f'user_notifications_{friendship.from_user.id}',
+                    {
+                        'type': 'friend_request_accepted',
+                        'by_display_name': request.user.profile.display_name,
+                    },
+                )
+
             return Response({'message': 'Accepted'})
         friendship.delete()
         return Response({'message': 'Rejected'})

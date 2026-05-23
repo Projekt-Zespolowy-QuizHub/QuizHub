@@ -34,6 +34,7 @@ export default function LobbyPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const hasJoinedRef = useRef(false);
 
   const myAvatar = user?.avatar ?? 'fox';
 
@@ -56,11 +57,15 @@ export default function LobbyPage() {
   }, [code, router]));
 
   useEffect(() => {
-    if (status === 'connected' && myNick) {
+    if (status !== 'connected' || !myNick) return;
+    if (!hasJoinedRef.current) {
+      send({ type: 'join', nickname: myNick, avatar: myAvatar });
+      hasJoinedRef.current = true;
+    } else {
       send({ type: 'rejoin', nickname: myNick });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, myNick]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -75,9 +80,8 @@ export default function LobbyPage() {
       const me = room.players.find(p => p.nickname === nick);
       setIsHost(me?.is_host ?? false);
       setLoading(false);
-      send({ type: 'join', nickname: nick, avatar: myAvatar });
     });
-  }, [code, send, myAvatar]);
+  }, [code]);
 
   const sendChat = () => {
     const text = chatInput.trim();

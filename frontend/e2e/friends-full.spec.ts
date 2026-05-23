@@ -104,7 +104,7 @@ test.describe('Znajomi - pelny przeplyw', () => {
       await page.goto('/friends');
       await expect(page.getByText('DoOdrzucenia')).toBeVisible();
 
-      await page.getByRole('button', { name: /Odrzuc/i }).click();
+      await page.getByRole('button', { name: /Odrzu/i }).click();
 
       expect(respondBody).toContain('reject');
     });
@@ -170,7 +170,7 @@ test.describe('Znajomi - pelny przeplyw', () => {
       await page.getByRole('button', { name: 'Szukaj' }).click();
 
       await expect(page.getByText('IstniejacyZnajomy')).toBeVisible();
-      await expect(page.getByText('Znajomy')).toBeVisible();
+      await expect(page.getByText('Znajomy', { exact: true })).toBeVisible();
     });
 
     test('wyszukiwanie z 1 znakiem nie uruchamia zapytania API', async ({ page }) => {

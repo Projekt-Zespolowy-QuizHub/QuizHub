@@ -154,6 +154,79 @@ export interface PackDetail {
   questions: PackQuestion[];
 }
 
+export interface Clan {
+  id: number;
+  name: string;
+  tag: string;
+  avatar: string;
+  description: string;
+  is_open: boolean;
+  max_members: number;
+  member_count: number;
+  leader: string;
+  total_score: number;
+  is_member: boolean;
+  created_at: string;
+  rank?: number;
+}
+
+export interface ClanMember {
+  user_id: number;
+  display_name: string;
+  avatar: string;
+  total_score: number;
+  games_played: number;
+  role: 'leader' | 'officer' | 'member';
+  joined_at: string;
+}
+
+export interface ClanDetail extends Clan {
+  members: ClanMember[];
+}
+
+export interface ClanLeaderboardEntry {
+  rank: number;
+  id: number;
+  name: string;
+  tag: string;
+  avatar: string;
+  total_score: number;
+  member_count: number;
+  leader: string;
+}
+
+export interface Tournament {
+  id: number;
+  name: string;
+  icon: string;
+  category: string;
+  status: 'upcoming' | 'active' | 'finished';
+  start_date: string;
+  end_date: string;
+  max_participants: number;
+  participant_count: number;
+  prize_coins: number;
+  description: string;
+  is_open: boolean;
+  is_participant: boolean;
+  creator_name: string;
+  created_at: string;
+}
+
+export interface TournamentParticipant {
+  rank: number;
+  user_id: number;
+  display_name: string;
+  avatar: string;
+  score: number;
+  games_played: number;
+  joined_at: string;
+}
+
+export interface TournamentDetail extends Tournament {
+  participants: TournamentParticipant[];
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -262,4 +335,62 @@ export const api = {
     }),
   deleteQuestion: (packId: number, qId: number) =>
     apiFetch<void>(`/packs/${packId}/questions/${qId}/`, { method: 'DELETE' }),
+
+  // Clans
+  listClans: () =>
+    apiFetch<Clan[]>('/clans/'),
+  getClan: (id: number) =>
+    apiFetch<ClanDetail>(`/clans/${id}/`),
+  createClan: (payload: {
+    name: string;
+    tag: string;
+    description?: string;
+    avatar?: string;
+    is_open?: boolean;
+    max_members?: number;
+  }) =>
+    apiFetch<Clan>('/clans/', { method: 'POST', body: JSON.stringify(payload) }),
+  joinClan: (id: number) =>
+    apiFetch<{ message: string }>(`/clans/${id}/join/`, { method: 'POST' }),
+  leaveClan: (id: number) =>
+    apiFetch<{ message: string }>(`/clans/${id}/leave/`, { method: 'POST' }),
+  inviteToClan: (id: number, userId: number) =>
+    apiFetch<{ message: string }>(`/clans/${id}/invite/`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    }),
+  kickFromClan: (id: number, userId: number) =>
+    apiFetch<{ message: string }>(`/clans/${id}/kick/`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    }),
+  respondClanInvite: (inviteId: number, action: 'accept' | 'reject') =>
+    apiFetch<{ message: string }>('/clans/invite/respond/', {
+      method: 'POST',
+      body: JSON.stringify({ invite_id: inviteId, action }),
+    }),
+  getClanLeaderboard: () =>
+    apiFetch<ClanLeaderboardEntry[]>('/clans/leaderboard/'),
+
+  // Tournaments
+  listTournaments: (status?: 'upcoming' | 'active' | 'finished') =>
+    apiFetch<Tournament[]>(`/tournaments/${status ? `?status=${status}` : ''}`),
+  getTournament: (id: number) =>
+    apiFetch<TournamentDetail>(`/tournaments/${id}/`),
+  createTournament: (payload: {
+    name: string;
+    category: string;
+    start_date: string;
+    end_date: string;
+    max_participants: number;
+    prize_coins?: number;
+    description?: string;
+    icon?: string;
+    is_open?: boolean;
+  }) =>
+    apiFetch<Tournament>('/tournaments/', { method: 'POST', body: JSON.stringify(payload) }),
+  joinTournament: (id: number) =>
+    apiFetch<{ message: string }>(`/tournaments/${id}/join/`, { method: 'POST' }),
+  leaveTournament: (id: number) =>
+    apiFetch<{ message: string }>(`/tournaments/${id}/leave/`, { method: 'POST' }),
 };

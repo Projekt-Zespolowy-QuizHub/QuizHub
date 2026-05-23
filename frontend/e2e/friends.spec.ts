@@ -134,7 +134,6 @@ test.describe('Znajomi', () => {
         ),
       });
     });
-
     await page.route('**/api/friends/respond/', async route => {
       requestAccepted = true;
       await route.fulfill({

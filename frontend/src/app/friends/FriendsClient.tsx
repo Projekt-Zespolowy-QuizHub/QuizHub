@@ -6,6 +6,7 @@ import { api, Friend, PendingRequest, SearchResult } from '@/lib/api';
 import { useToast } from '@/lib/ToastContext';
 import { useAuth } from '@/lib/AuthProvider';
 import { useLocale } from '@/lib/LocaleContext';
+import { usePendingRequests } from '@/lib/PendingRequestsContext';
 
 interface Props {
   initialFriends: Friend[];
@@ -17,6 +18,7 @@ export default function FriendsClient({ initialFriends, initialPending }: Props)
   const { show } = useToast();
   const { user } = useAuth();
   const { t } = useLocale();
+  const { refetch: refetchPendingCount } = usePendingRequests();
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [friends, setFriends] = useState(initialFriends);
@@ -91,6 +93,7 @@ export default function FriendsClient({ initialFriends, initialPending }: Props)
     try {
       await api.respondFriendRequest(requestId, action);
       await refreshFriendState();
+      await refetchPendingCount();
       if (action === 'accept') {
         show(t('friends_invite_accepted'), 'success');
       } else {
@@ -106,7 +109,6 @@ export default function FriendsClient({ initialFriends, initialPending }: Props)
     <div className="max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold text-white mb-8">{t('friends_title')}</h1>
 
-      {/* Search */}
       <div className="glass-card p-6 mb-6">
         <div className="flex gap-3">
           <input
@@ -119,28 +121,25 @@ export default function FriendsClient({ initialFriends, initialPending }: Props)
         </div>
         {searchResults.length > 0 && (
           <div className="mt-4 space-y-2">
-            {searchResults.map(r => {
-              return (
-                <div key={r.id} className="flex items-center justify-between bg-white/5 rounded-lg px-4 py-2">
-                  <div className="flex items-center gap-3">
-                    <div className="avatar">{r.display_name.charAt(0).toUpperCase()}</div>
-                    <span className="text-white">{r.display_name}</span>
-                  </div>
-                  {isAlreadyFriend(r) ? (
-                    <span className="text-green-400 text-sm">{t('friends_already_friend')}</span>
-                  ) : (
-                    <button onClick={() => handleSendRequest(r.id)} className="text-yellow-400 text-sm hover:underline">
-                      {t('friends_add_btn')}
-                    </button>
-                  )}
+            {searchResults.map(r => (
+              <div key={r.id} className="flex items-center justify-between bg-white/5 rounded-lg px-4 py-2">
+                <div className="flex items-center gap-3">
+                  <div className="avatar">{r.display_name.charAt(0).toUpperCase()}</div>
+                  <span className="text-white">{r.display_name}</span>
                 </div>
-              );
-            })}
+                {isAlreadyFriend(r) ? (
+                  <span className="text-green-400 text-sm">{t('friends_already_friend')}</span>
+                ) : (
+                  <button onClick={() => handleSendRequest(r.id)} className="text-yellow-400 text-sm hover:underline">
+                    {t('friends_add_btn')}
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Pending requests */}
       <div className="glass-card p-6 mb-6">
         <h3 className="text-white font-bold mb-4">{t('friends_pending')} ({pending.length})</h3>
         {pending.length === 0 ? (
@@ -163,7 +162,6 @@ export default function FriendsClient({ initialFriends, initialPending }: Props)
         )}
       </div>
 
-      {/* Friends list */}
       <div className="glass-card p-6">
         <h3 className="text-white font-bold mb-4">{t('friends_list')}</h3>
         {friends.length === 0 ? (
@@ -180,7 +178,7 @@ export default function FriendsClient({ initialFriends, initialPending }: Props)
                   disabled={challengingId === f.id}
                   className="btn-primary text-xs py-1 px-3"
                 >
-                  {challengingId === f.id ? '...' : 'Wyzwij'}
+                  {challengingId === f.id ? '...' : '⚔️ Wyzwij'}
                 </button>
               </div>
             ))}
