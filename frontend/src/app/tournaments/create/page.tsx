@@ -63,6 +63,7 @@ export default function CreateTournamentPage() {
         prize_coins: prizeCoins,
         description: description.trim(),
         icon,
+        is_open: isOpen,
       });
       show('Turniej został utworzony!', 'success');
       router.push(`/tournaments/${tournament.id}`);

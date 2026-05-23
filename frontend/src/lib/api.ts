@@ -386,6 +386,7 @@ export const api = {
     prize_coins?: number;
     description?: string;
     icon?: string;
+    is_open?: boolean;
   }) =>
     apiFetch<Tournament>('/tournaments/', { method: 'POST', body: JSON.stringify(payload) }),
   joinTournament: (id: number) =>
