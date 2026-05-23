@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useGameSocket, ConnectionStatus } from '@/lib/useGameSocket';
 import { useAuth } from '@/lib/AuthProvider';
+import { api } from '@/lib/api';
 import { getAvatarEmoji } from '@/lib/avatars';
 import { OPTION_LABELS, getMedalEmoji } from '@/lib/constants';
 import { StatusBanner } from '@/components/StatusBanner';
@@ -34,6 +35,11 @@ interface LeaderboardEntry {
 }
 
 const TIMER_SECONDS = 30;
+const EMPTY_POWERUP_COUNTS = {
+  fifty_fifty: 0,
+  extra_time: 0,
+  double_points: 0,
+};
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -131,6 +137,7 @@ export default function GamePage() {
   const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
   const [totalScore, setTotalScore] = useState(0);
   const [powerupsUsed, setPowerupsUsed] = useState<Set<string>>(new Set());
+  const [powerupCounts, setPowerupCounts] = useState<Record<string, number>>(EMPTY_POWERUP_COUNTS);
   const [removedOptions, setRemovedOptions] = useState<Set<string>>(new Set());
   const [doublePointsActive, setDoublePointsActive] = useState(false);
 
@@ -190,6 +197,11 @@ export default function GamePage() {
     }
 
     if (msg.type === 'powerup_result') {
+      setPowerupsUsed(prev => new Set([...prev, msg.powerup]));
+      setPowerupCounts(prev => ({
+        ...prev,
+        [msg.powerup]: msg.remaining_quantity,
+      }));
       if (msg.powerup === 'fifty_fifty') {
         setRemovedOptions(new Set(msg.removed_options));
       }
@@ -230,9 +242,33 @@ export default function GamePage() {
     return clearTimer;
   }, [code, send, myAvatar]);
 
+  useEffect(() => {
+    let active = true;
+    if (!user) {
+      setPowerupCounts(EMPTY_POWERUP_COUNTS);
+      return;
+    }
+    api.getShopInventory()
+      .then((items) => {
+        if (!active) return;
+        const next = { ...EMPTY_POWERUP_COUNTS };
+        for (const item of items) {
+          if (item.item_type === 'powerup' && item.code in next) {
+            next[item.code as keyof typeof next] = item.quantity;
+          }
+        }
+        setPowerupCounts(next);
+      })
+      .catch(() => {
+        if (active) setPowerupCounts(EMPTY_POWERUP_COUNTS);
+      });
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
   const usePowerup = (powerup: string) => {
-    if (powerupsUsed.has(powerup) || phase !== 'question') return;
-    setPowerupsUsed(prev => new Set([...prev, powerup]));
+    if (powerupsUsed.has(powerup) || phase !== 'question' || (powerupCounts[powerup] ?? 0) <= 0) return;
     send({ type: 'use_powerup', powerup, nickname: myNick, round_number: currentQuestion?.round_number });
   };
 
@@ -334,18 +370,18 @@ export default function GamePage() {
           <button
             key={id}
             onClick={() => usePowerup(id)}
-            disabled={powerupsUsed.has(id) || phase !== 'question'}
+            disabled={powerupsUsed.has(id) || phase !== 'question' || (powerupCounts[id] ?? 0) <= 0}
             title={label}
             className={clsx(
               'flex-1 py-3 rounded-xl text-sm font-bold border transition-all min-h-[44px]',
-              powerupsUsed.has(id)
+              powerupsUsed.has(id) || (powerupCounts[id] ?? 0) <= 0
                 ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
                 : 'border-[#6C63FF]/50 text-[#6C63FF] hover:bg-[#6C63FF]/10',
               id === 'double_points' && doublePointsActive && 'border-yellow-400 text-yellow-400'
             )}
           >
             <span className="block text-lg leading-none">{icon}</span>
-            <span className="text-xs">{label}</span>
+            <span className="text-xs">{label} x{powerupCounts[id] ?? 0}</span>
           </button>
         ))}
       </div>

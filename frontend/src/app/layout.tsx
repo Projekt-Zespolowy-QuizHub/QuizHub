@@ -10,6 +10,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import NotificationsMount from "@/components/NotificationsMount";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import TournamentBanner from "@/components/TournamentBanner";
+import ThemeMount from "@/components/ThemeMount";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -32,6 +33,7 @@ export default function RootLayout({
             <AuthProvider>
               <ToastProvider>
                 <PendingRequestsProvider>
+                  <ThemeMount />
                   <TournamentBanner />
                   <Navbar />
                   <NotificationsMount />

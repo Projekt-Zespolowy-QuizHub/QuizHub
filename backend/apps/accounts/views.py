@@ -14,7 +14,12 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, inline_serial
 from rest_framework import serializers as drf_serializers
 
 from .serializers import RegisterSerializer, LoginSerializer, UserProfileSerializer, ClanListSerializer, ClanDetailSerializer
-from .models import UserProfile, Friendship, Achievement, UserAchievement, Challenge, Season, SeasonResult, Clan, ClanMembership, ClanInvite, DailyChallenge, UserChallengeProgress, ShopItem, UserItem, AVATAR_CHOICES, AVATAR_EMOJI
+from .models import (
+    UserProfile, Friendship, Achievement, UserAchievement, Challenge, Season,
+    SeasonResult, Clan, ClanMembership, ClanInvite, DailyChallenge,
+    UserChallengeProgress, ShopItem, UserItem, AVATAR_CHOICES, AVATAR_EMOJI,
+    DEFAULT_THEME_CODE, STARTER_AVATAR_CODE,
+)
 from .achievements import ensure_achievements_exist
 from quizarena.throttles import AuthRateThrottle
 
@@ -680,9 +685,25 @@ class UpdateAvatarView(APIView):
         valid_keys = [k for k, _ in AVATAR_CHOICES]
         if avatar not in valid_keys:
             return Response({'error': 'Invalid avatar'}, status=status.HTTP_400_BAD_REQUEST)
+        if avatar != STARTER_AVATAR_CODE and not UserItem.objects.filter(
+            user=request.user,
+            item__code=avatar,
+            item__item_type=ShopItem.ItemType.AVATAR,
+            quantity__gt=0,
+        ).exists():
+            return Response({'error': 'Avatar not owned'}, status=status.HTTP_400_BAD_REQUEST)
         profile = request.user.profile
         profile.avatar = avatar
-        profile.save()
+        profile.save(update_fields=['avatar'])
+        UserItem.objects.filter(
+            user=request.user,
+            item__item_type=ShopItem.ItemType.AVATAR,
+        ).update(is_equipped=False)
+        UserItem.objects.filter(
+            user=request.user,
+            item__code=avatar,
+            item__item_type=ShopItem.ItemType.AVATAR,
+        ).update(is_equipped=True)
         return Response({'avatar': avatar})
 
 
@@ -1349,6 +1370,33 @@ class ClaimChallengeRewardView(APIView):
 
 # ─── Shop ──────────────────────────────────────────────────────────────
 
+def _is_starter_item(item: ShopItem) -> bool:
+    return (
+        (item.item_type == ShopItem.ItemType.AVATAR and item.code == STARTER_AVATAR_CODE) or
+        (item.item_type == ShopItem.ItemType.THEME and item.code == DEFAULT_THEME_CODE)
+    )
+
+
+def _item_owned(item: ShopItem, user_item: UserItem | None) -> bool:
+    if item.item_type == ShopItem.ItemType.POWERUP:
+        return bool(user_item and user_item.quantity > 0)
+    return bool(user_item) or _is_starter_item(item)
+
+
+def _item_quantity(item: ShopItem, user_item: UserItem | None) -> int:
+    if user_item:
+        return user_item.quantity
+    return 1 if _is_starter_item(item) else 0
+
+
+def _item_is_equipped(profile: UserProfile, item: ShopItem, user_item: UserItem | None) -> bool:
+    if item.item_type == ShopItem.ItemType.AVATAR:
+        return profile.avatar == item.code
+    if item.item_type == ShopItem.ItemType.THEME:
+        return profile.theme == item.code
+    return bool(user_item and user_item.is_equipped)
+
+
 class ShopListView(APIView):
     """GET /api/shop/ — lista aktywnych przedmiotów sklepu"""
     permission_classes = [IsAuthenticated]
@@ -1358,28 +1406,37 @@ class ShopListView(APIView):
         description='Zwraca wszystkie aktywne przedmioty dostępne w sklepie.',
         responses={200: inline_serializer('ShopItemResponse', fields={
             'id': drf_serializers.IntegerField(),
+            'code': drf_serializers.CharField(),
             'name': drf_serializers.CharField(),
             'description': drf_serializers.CharField(),
             'item_type': drf_serializers.CharField(),
             'price': drf_serializers.IntegerField(),
             'emoji_icon': drf_serializers.CharField(),
+            'owned': drf_serializers.BooleanField(),
+            'quantity': drf_serializers.IntegerField(),
+            'is_equipped': drf_serializers.BooleanField(),
         }, many=True)},
         tags=['shop'],
     )
     def get(self, request):
-        items = ShopItem.objects.filter(is_active=True).order_by('item_type', 'price')
-        owned_ids = set(
-            UserItem.objects.filter(user=request.user).values_list('item_id', flat=True)
-        )
+        items = ShopItem.objects.filter(is_active=True).order_by('item_type', 'price', 'name')
+        user_items = {
+            user_item.item_id: user_item
+            for user_item in UserItem.objects.filter(user=request.user).select_related('item')
+        }
+        profile = request.user.profile
         return Response([
             {
                 'id': item.id,
+                'code': item.code,
                 'name': item.name,
                 'description': item.description,
                 'item_type': item.item_type,
                 'price': item.price,
                 'emoji_icon': item.emoji_icon,
-                'owned': item.id in owned_ids,
+                'owned': _item_owned(item, user_items.get(item.id)),
+                'quantity': _item_quantity(item, user_items.get(item.id)),
+                'is_equipped': _item_is_equipped(profile, item, user_items.get(item.id)),
             }
             for item in items
         ])
@@ -1397,6 +1454,7 @@ class BuyItemView(APIView):
             200: inline_serializer('BuyItemResponse', fields={
                 'message': drf_serializers.CharField(),
                 'coins': drf_serializers.IntegerField(),
+                'quantity': drf_serializers.IntegerField(),
             }),
             400: inline_serializer('BuyItemError', fields={'error': drf_serializers.CharField()}),
             404: inline_serializer('BuyItemNotFound', fields={'error': drf_serializers.CharField()}),
@@ -1410,7 +1468,10 @@ class BuyItemView(APIView):
         except ShopItem.DoesNotExist:
             return Response({'error': 'Przedmiot nie znaleziony'}, status=status.HTTP_404_NOT_FOUND)
 
-        if UserItem.objects.filter(user=request.user, item=item).exists():
+        existing_item = UserItem.objects.filter(user=request.user, item=item).first()
+        if _is_starter_item(item):
+            return Response({'error': 'Posiadasz już ten przedmiot'}, status=status.HTTP_400_BAD_REQUEST)
+        if existing_item and item.item_type != ShopItem.ItemType.POWERUP:
             return Response({'error': 'Posiadasz już ten przedmiot'}, status=status.HTTP_400_BAD_REQUEST)
 
         profile = request.user.profile
@@ -1419,9 +1480,23 @@ class BuyItemView(APIView):
 
         profile.coins -= item.price
         profile.save(update_fields=['coins'])
-        UserItem.objects.create(user=request.user, item=item)
+        if existing_item:
+            existing_item.quantity += 1
+            existing_item.save(update_fields=['quantity'])
+            quantity = existing_item.quantity
+        else:
+            created = UserItem.objects.create(
+                user=request.user,
+                item=item,
+                quantity=1,
+            )
+            quantity = created.quantity
 
-        return Response({'message': f'Zakupiono {item.name}', 'coins': profile.coins})
+        return Response({
+            'message': f'Zakupiono {item.name}',
+            'coins': profile.coins,
+            'quantity': quantity,
+        })
 
 
 class EquipItemView(APIView):
@@ -1435,7 +1510,9 @@ class EquipItemView(APIView):
         responses={
             200: inline_serializer('EquipItemResponse', fields={
                 'is_equipped': drf_serializers.BooleanField(),
+                'code': drf_serializers.CharField(required=False),
             }),
+            400: inline_serializer('EquipItemError', fields={'error': drf_serializers.CharField()}),
             404: inline_serializer('EquipItemNotFound', fields={'error': drf_serializers.CharField()}),
         },
         tags=['shop'],
@@ -1443,17 +1520,49 @@ class EquipItemView(APIView):
     def post(self, request):
         item_id = request.data.get('item_id')
         try:
-            user_item = UserItem.objects.select_related('item').get(
-                user=request.user, item_id=item_id
-            )
-        except UserItem.DoesNotExist:
+            item = ShopItem.objects.get(id=item_id, is_active=True)
+        except ShopItem.DoesNotExist:
+            return Response({'error': 'Przedmiot nie znaleziony'}, status=status.HTTP_404_NOT_FOUND)
+
+        user_item = UserItem.objects.select_related('item').filter(
+            user=request.user, item_id=item_id
+        ).first()
+        if not _item_owned(item, user_item):
             return Response({'error': 'Nie posiadasz tego przedmiotu'}, status=status.HTTP_404_NOT_FOUND)
+
+        profile = request.user.profile
+        if item.item_type == ShopItem.ItemType.POWERUP:
+            return Response({'error': 'Power-upów nie aktywuje się w sklepie'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if item.item_type == ShopItem.ItemType.AVATAR:
+            profile.avatar = item.code
+            profile.save(update_fields=['avatar'])
+            UserItem.objects.filter(
+                user=request.user,
+                item__item_type=ShopItem.ItemType.AVATAR,
+            ).update(is_equipped=False)
+            if user_item:
+                user_item.is_equipped = True
+                user_item.save(update_fields=['is_equipped'])
+            return Response({'is_equipped': True, 'code': item.code})
+
+        if item.item_type == ShopItem.ItemType.THEME:
+            profile.theme = item.code
+            profile.save(update_fields=['theme'])
+            UserItem.objects.filter(
+                user=request.user,
+                item__item_type=ShopItem.ItemType.THEME,
+            ).update(is_equipped=False)
+            if user_item:
+                user_item.is_equipped = True
+                user_item.save(update_fields=['is_equipped'])
+            return Response({'is_equipped': True, 'code': item.code})
 
         if not user_item.is_equipped:
             # Zdejmij inne przedmioty tego samego typu
             UserItem.objects.filter(
                 user=request.user,
-                item__item_type=user_item.item.item_type,
+                item__item_type=item.item_type,
                 is_equipped=True,
             ).update(is_equipped=False)
             user_item.is_equipped = True
@@ -1461,7 +1570,7 @@ class EquipItemView(APIView):
             user_item.is_equipped = False
 
         user_item.save(update_fields=['is_equipped'])
-        return Response({'is_equipped': user_item.is_equipped})
+        return Response({'is_equipped': user_item.is_equipped, 'code': item.code})
 
 
 class UserInventoryView(APIView):
@@ -1474,27 +1583,36 @@ class UserInventoryView(APIView):
         responses={200: inline_serializer('InventoryItemResponse', fields={
             'id': drf_serializers.IntegerField(),
             'item_id': drf_serializers.IntegerField(),
+            'code': drf_serializers.CharField(),
             'name': drf_serializers.CharField(),
             'description': drf_serializers.CharField(),
             'item_type': drf_serializers.CharField(),
             'emoji_icon': drf_serializers.CharField(),
             'purchased_at': drf_serializers.DateTimeField(),
             'is_equipped': drf_serializers.BooleanField(),
+            'quantity': drf_serializers.IntegerField(),
         }, many=True)},
         tags=['shop'],
     )
     def get(self, request):
-        user_items = UserItem.objects.filter(user=request.user).select_related('item').order_by('-purchased_at')
+        user_items = UserItem.objects.filter(
+            user=request.user,
+        ).exclude(
+            item__item_type=ShopItem.ItemType.POWERUP,
+            quantity__lte=0,
+        ).select_related('item').order_by('-purchased_at')
         return Response([
             {
                 'id': ui.id,
                 'item_id': ui.item.id,
+                'code': ui.item.code,
                 'name': ui.item.name,
                 'description': ui.item.description,
                 'item_type': ui.item.item_type,
                 'emoji_icon': ui.item.emoji_icon,
                 'purchased_at': ui.purchased_at.isoformat(),
                 'is_equipped': ui.is_equipped,
+                'quantity': ui.quantity,
             }
             for ui in user_items
         ])

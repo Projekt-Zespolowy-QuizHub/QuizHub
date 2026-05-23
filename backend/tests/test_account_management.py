@@ -12,7 +12,7 @@ import pytest
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from rest_framework.test import APIClient
-from apps.accounts.models import UserProfile, AVATAR_CHOICES
+from apps.accounts.models import UserProfile, ShopItem, UserItem
 
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -41,6 +41,17 @@ def client_auth(user):
 # ─── Avatar change ────────────────────────────────────────────────────────────
 
 def test_update_avatar_valid_key(client_auth, user):
+    item = ShopItem.objects.create(
+        code='wolf',
+        name='Wilk',
+        description='Avatar wilka',
+        item_type='avatar',
+        price=100,
+        emoji_icon='🐺',
+        is_active=True,
+    )
+    UserItem.objects.create(user=user, item=item)
+
     resp = client_auth.patch('/api/profile/avatar/', {'avatar': 'wolf'}, format='json')
     assert resp.status_code == 200
     assert resp.data['avatar'] == 'wolf'
@@ -48,11 +59,15 @@ def test_update_avatar_valid_key(client_auth, user):
     assert user.profile.avatar == 'wolf'
 
 
-def test_update_avatar_all_valid_keys(client_auth, user):
-    """Każdy klucz z AVATAR_CHOICES powinien być akceptowany."""
-    for key, _ in AVATAR_CHOICES:
-        resp = client_auth.patch('/api/profile/avatar/', {'avatar': key}, format='json')
-        assert resp.status_code == 200, f'Avatar {key!r} powinien być poprawny'
+def test_update_avatar_starting_fox_is_allowed(client_auth):
+    resp = client_auth.patch('/api/profile/avatar/', {'avatar': 'fox'}, format='json')
+    assert resp.status_code == 200
+    assert resp.data['avatar'] == 'fox'
+
+
+def test_update_avatar_requires_ownership_for_paid_avatar(client_auth):
+    resp = client_auth.patch('/api/profile/avatar/', {'avatar': 'wolf'}, format='json')
+    assert resp.status_code == 400
 
 
 def test_update_avatar_invalid_key(client_auth):
@@ -81,6 +96,7 @@ def test_me_returns_profile(client_auth, user):
     assert 'total_score' in resp.data
     assert 'games_played' in resp.data
     assert 'avatar' in resp.data
+    assert 'theme' in resp.data
 
 
 def test_me_unauthenticated():

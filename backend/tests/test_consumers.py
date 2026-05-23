@@ -1,10 +1,12 @@
 import asyncio
 import pytest
 import pytest_asyncio
+from django.contrib.auth.models import User
 from channels.testing import WebsocketCommunicator
 from channels.db import database_sync_to_async
 from quizarena.asgi import application
 from apps.rooms.models import Room, Player
+from apps.accounts.models import UserProfile, ShopItem, UserItem
 from apps.rooms.consumers import (
     GameConsumer,
     _disconnect_tasks,
@@ -52,8 +54,27 @@ def fast_rounds(monkeypatch):
     monkeypatch.setattr(GameConsumer, 'ROUND_DURATION_SECONDS', 1)
 
 
-async def _connect_and_join(room_code: str, nickname: str) -> WebsocketCommunicator:
+@database_sync_to_async
+def _create_powerup_user(email: str, powerup_code: str, quantity: int = 1):
+    user = User.objects.create_user(email, email, 'pass1234')
+    UserProfile.objects.create(user=user, display_name=email.split('@')[0], coins=500)
+    item = ShopItem.objects.create(
+        code=powerup_code,
+        name=powerup_code,
+        description='Test power-up',
+        item_type='powerup',
+        price=50,
+        emoji_icon='⚡',
+        is_active=True,
+    )
+    UserItem.objects.create(user=user, item=item, quantity=quantity)
+    return user
+
+
+async def _connect_and_join(room_code: str, nickname: str, user=None) -> WebsocketCommunicator:
     comm = WebsocketCommunicator(application, f'/ws/room/{room_code}/')
+    if user is not None:
+        comm.scope['user'] = user
     connected, _ = await comm.connect()
     assert connected
     await comm.send_json_to({'type': 'join', 'nickname': nickname})
@@ -224,7 +245,8 @@ async def test_chat_message_max_length(room):
 @pytest.mark.django_db(transaction=True)
 async def test_powerup_extra_time(room, clear_powerup_state):
     """extra_time power-up odsyła powerup_result z extra_seconds."""
-    player = await _connect_and_join(room.code, 'Player')
+    user = await _create_powerup_user('powerup-extra@test.com', 'extra_time')
+    player = await _connect_and_join(room.code, 'Player', user=user)
     await player.receive_json_from()
 
     await player.send_json_to({
@@ -235,7 +257,7 @@ async def test_powerup_extra_time(room, clear_powerup_state):
     })
 
     msg = await asyncio.wait_for(player.receive_json_from(), timeout=1.0)
-    assert msg == {'type': 'powerup_result', 'powerup': 'extra_time', 'extra_seconds': 15}
+    assert msg == {'type': 'powerup_result', 'powerup': 'extra_time', 'extra_seconds': 15, 'remaining_quantity': 0}
 
     await player.disconnect()
 
@@ -244,7 +266,8 @@ async def test_powerup_extra_time(room, clear_powerup_state):
 @pytest.mark.django_db(transaction=True)
 async def test_powerup_cannot_use_twice(room, clear_powerup_state):
     """Power-up można użyć tylko raz per grę."""
-    player = await _connect_and_join(room.code, 'Player')
+    user = await _create_powerup_user('powerup-twice@test.com', 'extra_time', quantity=2)
+    player = await _connect_and_join(room.code, 'Player', user=user)
     await player.receive_json_from()
 
     await player.send_json_to({
@@ -255,6 +278,7 @@ async def test_powerup_cannot_use_twice(room, clear_powerup_state):
     })
     msg = await asyncio.wait_for(player.receive_json_from(), timeout=1.0)
     assert msg['type'] == 'powerup_result'
+    assert msg['remaining_quantity'] == 1
 
     # Drugi raz — brak odpowiedzi
     await player.send_json_to({

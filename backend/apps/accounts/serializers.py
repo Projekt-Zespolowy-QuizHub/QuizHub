@@ -29,7 +29,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ['id', 'display_name', 'email', 'total_score', 'games_played', 'avatar', 'coins', 'created_at']
+        fields = ['id', 'display_name', 'email', 'total_score', 'games_played', 'avatar', 'theme', 'coins', 'created_at']
 
 
 class ClanMemberSerializer(serializers.ModelSerializer):

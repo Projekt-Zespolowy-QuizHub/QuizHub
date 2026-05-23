@@ -5,13 +5,72 @@
 :root {
   --primary: #6C63FF;
   --accent: #FFC107;
+  --accent-hover: #FFE082;
+  --accent-contrast: #111111;
   --dark: #1A1A2E;
   --card: #16213E;
+  --bg-1: #7B2FF7;
+  --bg-2: #6C3CE0;
+  --bg-3: #4A5FE0;
+  --bg-4: #2196F3;
 }
 
 body {
-  background: linear-gradient(135deg, #7B2FF7 0%, #6C3CE0 30%, #4A5FE0 60%, #2196F3 100%);
+  background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 30%, var(--bg-3) 60%, var(--bg-4) 100%);
   min-height: 100vh;
+  transition: background 0.3s ease;
+}
+
+body[data-theme="default"] {
+  --primary: #6C63FF;
+  --accent: #FFC107;
+  --accent-hover: #FFE082;
+  --accent-contrast: #111111;
+  --dark: #1A1A2E;
+  --card: #16213E;
+  --bg-1: #7B2FF7;
+  --bg-2: #6C3CE0;
+  --bg-3: #4A5FE0;
+  --bg-4: #2196F3;
+}
+
+body[data-theme="galaxy"] {
+  --primary: #9B7CFF;
+  --accent: #FFDC7B;
+  --accent-hover: #FFE7A9;
+  --accent-contrast: #1A1028;
+  --dark: #0D0D1A;
+  --card: #1E1338;
+  --bg-1: #050816;
+  --bg-2: #24114C;
+  --bg-3: #5336B8;
+  --bg-4: #1E5EFF;
+}
+
+body[data-theme="ocean"] {
+  --primary: #4CC9F0;
+  --accent: #FFD166;
+  --accent-hover: #FFE29A;
+  --accent-contrast: #102036;
+  --dark: #081726;
+  --card: #0D2B45;
+  --bg-1: #04111F;
+  --bg-2: #0A2C47;
+  --bg-3: #115173;
+  --bg-4: #2A89B8;
+}
+
+body[data-theme="forest"] {
+  --primary: #7BC67B;
+  --accent: #F4D35E;
+  --accent-hover: #F8E08A;
+  --accent-contrast: #152114;
+  --dark: #0B160C;
+  --card: #17311B;
+  --bg-1: #08110A;
+  --bg-2: #15311B;
+  --bg-3: #27553A;
+  --bg-4: #4B8B5A;
 }
 
 /* ─── Animations ─────────────────────────────────────────────── */
@@ -108,9 +167,15 @@ body {
 
 /* Yellow primary button */
 .btn-primary {
-  @apply bg-yellow-400 text-black font-bold px-6 py-2.5 rounded-lg
-         hover:bg-yellow-300 active:scale-95 transition-all duration-150
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+  @apply font-bold px-6 py-2.5 rounded-lg
+         active:scale-95 transition-all duration-150
          disabled:opacity-50 disabled:active:scale-100;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover);
 }
 
 /* Answer button states — Kahoot-style */

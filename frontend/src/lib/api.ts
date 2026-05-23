@@ -28,6 +28,8 @@ export interface UserProfile {
   total_score: number;
   games_played: number;
   avatar: string;
+  theme: string;
+  coins: number;
   created_at: string;
 }
 
@@ -223,12 +225,43 @@ export interface TournamentParticipant {
   joined_at: string;
 }
 
+export interface ShopItem {
+  id: number;
+  code: string;
+  name: string;
+  description: string;
+  item_type: string;
+  price: number;
+  emoji_icon: string;
+  owned: boolean;
+  quantity: number;
+  is_equipped: boolean;
+}
+
+export interface InventoryItem {
+  id: number;
+  item_id: number;
+  code: string;
+  name: string;
+  description: string;
+  item_type: string;
+  emoji_icon: string;
+  purchased_at: string;
+  is_equipped: boolean;
+  quantity: number;
+}
+
 export interface TournamentDetail extends Tournament {
   participants: TournamentParticipant[];
 }
 
+function normalizeApiPath(path: string): string {
+  if (path === '/') return '';
+  return path.replace(/\/+(?=\?|$)/, '');
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`/api${normalizeApiPath(path)}`, {
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     ...options,
@@ -273,6 +306,24 @@ export const api = {
     apiFetch<Achievement[]>('/profile/achievements/'),
   updateAvatar: (avatar: string) =>
     apiFetch<{ avatar: string }>('/profile/avatar/', { method: 'PATCH', body: JSON.stringify({ avatar }) }),
+
+  // Shop
+  getShopItems: () =>
+    apiFetch<ShopItem[]>('/shop/'),
+  buyShopItem: (itemId: number) =>
+    apiFetch<{ message: string; coins: number; quantity: number }>('/shop/buy/', {
+      method: 'POST',
+      body: JSON.stringify({ item_id: itemId }),
+    }),
+  equipShopItem: (itemId: number) =>
+    apiFetch<{ is_equipped: boolean; code?: string }>('/shop/equip/', {
+      method: 'POST',
+      body: JSON.stringify({ item_id: itemId }),
+    }),
+  getShopInventory: () =>
+    apiFetch<InventoryItem[]>('/shop/inventory/'),
+  getShopCoins: () =>
+    apiFetch<{ coins: number }>('/shop/coins/'),
 
   // Friends
   searchUsers: (q: string) =>

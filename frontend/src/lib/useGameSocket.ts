@@ -14,9 +14,10 @@ export type WSMessage =
   | { type: 'answer_result'; is_correct: boolean; correct_answer: string; explanation: string; points_earned: number; total_score: number }
   | { type: 'game_over'; leaderboard: { nickname: string; score: number }[] }
   | { type: 'game_state'; room_status: string; current_round: number; total_rounds: number; score: number; current_question: { round_number: number; total_rounds: number; question: string; options: string[] } | null }
-  | { type: 'powerup_result'; powerup: 'fifty_fifty'; removed_options: string[] }
-  | { type: 'powerup_result'; powerup: 'extra_time'; extra_seconds: number }
-  | { type: 'powerup_result'; powerup: 'double_points' }
+  | { type: 'powerup_result'; powerup: 'fifty_fifty'; removed_options: string[]; remaining_quantity: number }
+  | { type: 'powerup_result'; powerup: 'extra_time'; extra_seconds: number; remaining_quantity: number }
+  | { type: 'powerup_result'; powerup: 'double_points'; remaining_quantity: number }
+  | { type: 'error'; message: string }
   | { type: 'chat_message'; nickname: string; text: string };
 
 export function useGameSocket(
