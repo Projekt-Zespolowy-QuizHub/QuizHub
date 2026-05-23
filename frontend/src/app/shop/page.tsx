@@ -5,7 +5,7 @@ import { api, ShopItem } from '@/lib/api';
 import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useToast } from '@/lib/ToastContext';
 import { useAuth } from '@/lib/AuthProvider';
-import { getThemePreview } from '@/lib/themes';
+import { getThemePreviewStyle } from '@/lib/themes';
 
 type ShopTab = 'avatars' | 'powerups' | 'themes';
 type PendingAction = { item: ShopItem; action: 'buy' | 'equip' } | null;
@@ -246,7 +246,10 @@ export default function ShopPage() {
           <div className="space-y-4">
             {themes.map((theme) => (
               <div key={theme.id} className="glass-card p-5 flex items-center gap-4">
-                <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${getThemePreview(theme.code)} border border-white/10 flex-shrink-0`} />
+                <div
+                  className="w-14 h-14 rounded-xl border border-white/10 flex-shrink-0"
+                  style={getThemePreviewStyle(theme.code)}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="text-white font-bold mb-0.5">{theme.name}</div>
                   <div className="text-white/50 text-sm">{theme.description}</div>
