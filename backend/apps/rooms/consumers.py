@@ -93,6 +93,39 @@ def _update_challenge_progress(player, room, player_rank: int) -> None:
         progress.save()
 
 
+def _update_tournament_progress(player, room) -> None:
+    """Doliczanie wyniku gracza do aktywnych turniejów. Wywołanie synchroniczne.
+
+    Reguła dopasowania: kategoria turnieju musi być na liście kategorii pokoju
+    (room.categories). Turniej musi mieć status active (now ∈ [start_date, end_date]).
+    """
+    from django.utils import timezone
+    from .models import Tournament, TournamentParticipant
+
+    if not player.user_id or player.score <= 0:
+        return
+
+    room_categories = room.categories or []
+    if not room_categories:
+        return
+
+    now = timezone.now()
+    participations = TournamentParticipant.objects.select_related('tournament').filter(
+        user=player.user,
+        tournament__category__in=room_categories,
+        tournament__start_date__lte=now,
+        tournament__end_date__gte=now,
+    )
+    for participation in participations:
+        # Sync statusu — gdyby był jeszcze 'upcoming' mimo że daty się zgadzają
+        if participation.tournament.status != Tournament.Status.ACTIVE:
+            participation.tournament.status = Tournament.Status.ACTIVE
+            participation.tournament.save(update_fields=['status'])
+        participation.score += player.score
+        participation.games_played += 1
+        participation.save(update_fields=['score', 'games_played'])
+
+
 def _clear_powerup_state(room_code: str) -> None:
     """Usuwa stan power-upów i survival dla danego pokoju."""
     for store in (_powerups_used, _double_points_active, _survival_eliminated):
@@ -653,6 +686,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                     player.user, player, room
                 )
                 await database_sync_to_async(_update_challenge_progress)(player, room, rank)
+                await database_sync_to_async(_update_tournament_progress)(player, room)
                 # Unieważnij cache statystyk gracza po aktualizacji wyników
                 await database_sync_to_async(cache.delete)(f'user_stats_{player.user.id}')
 

@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useToast } from '@/lib/ToastContext';
+import { api } from '@/lib/api';
+
+const AVATAR_OPTIONS = ['🛡️', '🏆', '⚔️', '🔬', '🌍', '⚽', '💻', '🎬', '🐉', '🦊', '🐺', '🦁'];
 
 export default function CreateClanPage() {
   useRequireAuth();
@@ -15,16 +18,17 @@ export default function CreateClanPage() {
   const [tag, setTag] = useState('');
   const [description, setDescription] = useState('');
   const [isOpen, setIsOpen] = useState(true);
+  const [avatar, setAvatar] = useState('🛡️');
   const [loading, setLoading] = useState(false);
 
   function handleTagChange(value: string) {
-    setTag(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3));
+    setTag(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5));
   }
 
   function validate(): string | null {
     if (!name.trim()) return 'Podaj nazwę klanu';
     if (name.trim().length < 3) return 'Nazwa klanu musi mieć co najmniej 3 znaki';
-    if (!tag || tag.length < 2) return 'Tag klanu musi mieć 2-3 znaki';
+    if (!tag || tag.length < 2) return 'Tag klanu musi mieć 2-5 znaków';
     return null;
   }
 
@@ -34,10 +38,20 @@ export default function CreateClanPage() {
     if (err) { show(err, 'error'); return; }
 
     setLoading(true);
-    // Simulate API call
-    await new Promise(r => setTimeout(r, 800));
-    show('Klan został utworzony!', 'success');
-    router.push('/clans');
+    try {
+      const clan = await api.createClan({
+        name: name.trim(),
+        tag: tag.trim(),
+        description: description.trim(),
+        is_open: isOpen,
+        avatar,
+      });
+      show('Klan został utworzony!', 'success');
+      router.push(`/clans/${clan.id}`);
+    } catch (e: any) {
+      show(e.message ?? 'Nie udało się utworzyć klanu', 'error');
+      setLoading(false);
+    }
   }
 
   const inputClass = 'w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none focus:border-[#6C63FF]/50 transition-colors';
@@ -70,7 +84,7 @@ export default function CreateClanPage() {
 
         {/* Tag */}
         <div>
-          <label className={labelClass}>Tag klanu * (2–3 znaki, wielkie litery)</label>
+          <label className={labelClass}>Tag klanu * (2–5 znaków, wielkie litery)</label>
           <div className="flex items-center gap-3">
             <span className="text-white/40 font-mono text-lg">[</span>
             <input
@@ -79,11 +93,32 @@ export default function CreateClanPage() {
               onChange={e => handleTagChange(e.target.value)}
               placeholder="TAG"
               className={`${inputClass} font-mono text-center text-lg tracking-widest uppercase`}
-              maxLength={3}
+              maxLength={5}
             />
             <span className="text-white/40 font-mono text-lg">]</span>
           </div>
           <p className="text-white/30 text-xs mt-1">Tag będzie wyświetlany przy nazwie klanu. Tylko litery A-Z i cyfry.</p>
+        </div>
+
+        {/* Avatar */}
+        <div>
+          <label className={labelClass}>Ikona klanu</label>
+          <div className="grid grid-cols-6 gap-2">
+            {AVATAR_OPTIONS.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => setAvatar(emoji)}
+                className={`text-2xl py-2 rounded-xl border transition-all ${
+                  avatar === emoji
+                    ? 'bg-[#6C63FF]/30 border-[#6C63FF]/60'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Description */}
@@ -139,7 +174,7 @@ export default function CreateClanPage() {
           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
             <p className="text-white/40 text-xs mb-2 uppercase tracking-wider">Podgląd</p>
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🛡️</span>
+              <span className="text-2xl">{avatar}</span>
               <span className="text-white font-bold">{name || 'Nazwa klanu'}</span>
               {tag && <span className="bg-white/10 text-white/60 text-sm px-2 py-0.5 rounded font-mono">[{tag}]</span>}
               {!isOpen && <span className="text-white/30 text-sm">🔒</span>}

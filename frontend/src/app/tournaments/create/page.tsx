@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useToast } from '@/lib/ToastContext';
+import { api } from '@/lib/api';
 
 const CATEGORIES = [
   'Ogólna wiedza',
@@ -18,6 +19,7 @@ const CATEGORIES = [
 ];
 
 const MAX_PARTICIPANTS_OPTIONS = [8, 16, 32, 64];
+const ICON_OPTIONS = ['🏆', '🥇', '⚔️', '🎯', '🔥', '⭐', '🚀', '👑'];
 
 export default function CreateTournamentPage() {
   useRequireAuth();
@@ -29,16 +31,19 @@ export default function CreateTournamentPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [maxParticipants, setMaxParticipants] = useState(32);
-  const [prize, setPrize] = useState('');
+  const [prizeCoins, setPrizeCoins] = useState<number>(0);
   const [description, setDescription] = useState('');
+  const [icon, setIcon] = useState('🏆');
+  const [isOpen, setIsOpen] = useState(true);
   const [loading, setLoading] = useState(false);
 
   function validate(): string | null {
     if (!name.trim()) return 'Podaj nazwę turnieju';
+    if (name.trim().length < 3) return 'Nazwa turnieju musi mieć co najmniej 3 znaki';
     if (!category) return 'Wybierz kategorię';
     if (!startDate) return 'Podaj datę rozpoczęcia';
     if (!endDate) return 'Podaj datę zakończenia';
-    if (endDate <= startDate) return 'Data zakończenia musi być po dacie rozpoczęcia';
+    if (new Date(endDate) <= new Date(startDate)) return 'Data zakończenia musi być po dacie rozpoczęcia';
     return null;
   }
 
@@ -48,10 +53,23 @@ export default function CreateTournamentPage() {
     if (err) { show(err, 'error'); return; }
 
     setLoading(true);
-    // Simulate API call
-    await new Promise(r => setTimeout(r, 800));
-    show('Turniej został utworzony!', 'success');
-    router.push('/tournaments');
+    try {
+      const tournament = await api.createTournament({
+        name: name.trim(),
+        category,
+        start_date: new Date(startDate).toISOString(),
+        end_date: new Date(endDate).toISOString(),
+        max_participants: maxParticipants,
+        prize_coins: prizeCoins,
+        description: description.trim(),
+        icon,
+      });
+      show('Turniej został utworzony!', 'success');
+      router.push(`/tournaments/${tournament.id}`);
+    } catch (e: any) {
+      show(e.message ?? 'Nie udało się utworzyć turnieju', 'error');
+      setLoading(false);
+    }
   }
 
   const inputClass = 'w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none focus:border-[#6C63FF]/50 transition-colors';
@@ -81,6 +99,27 @@ export default function CreateTournamentPage() {
           />
         </div>
 
+        {/* Icon */}
+        <div>
+          <label className={labelClass}>Ikona turnieju</label>
+          <div className="grid grid-cols-8 gap-2">
+            {ICON_OPTIONS.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => setIcon(emoji)}
+                className={`text-2xl py-2 rounded-xl border transition-all ${
+                  icon === emoji
+                    ? 'bg-[#6C63FF]/30 border-[#6C63FF]/60'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Category */}
         <div>
           <label className={labelClass}>Kategoria *</label>
@@ -101,7 +140,7 @@ export default function CreateTournamentPage() {
           <div>
             <label className={labelClass}>Data rozpoczęcia *</label>
             <input
-              type="date"
+              type="datetime-local"
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
               className={`${inputClass} [color-scheme:dark]`}
@@ -110,7 +149,7 @@ export default function CreateTournamentPage() {
           <div>
             <label className={labelClass}>Data zakończenia *</label>
             <input
-              type="date"
+              type="datetime-local"
               value={endDate}
               onChange={e => setEndDate(e.target.value)}
               min={startDate || undefined}
@@ -140,14 +179,46 @@ export default function CreateTournamentPage() {
           </div>
         </div>
 
+        {/* Open / Closed */}
+        <div>
+          <label className={labelClass}>Typ turnieju</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setIsOpen(true)}
+              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all border flex items-center justify-center gap-2 ${
+                isOpen
+                  ? 'bg-green-500/20 border-green-500/40 text-green-300'
+                  : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+              }`}
+            >
+              <span>🔓</span>
+              <span>Otwarty</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all border flex items-center justify-center gap-2 ${
+                !isOpen
+                  ? 'bg-red-500/20 border-red-500/40 text-red-300'
+                  : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+              }`}
+            >
+              <span>🔒</span>
+              <span>Zamknięty</span>
+            </button>
+          </div>
+        </div>
+
         {/* Prize */}
         <div>
-          <label className={labelClass}>Nagroda (opcjonalnie)</label>
+          <label className={labelClass}>Nagroda (monety)</label>
           <input
-            type="text"
-            value={prize}
-            onChange={e => setPrize(e.target.value)}
-            placeholder="Np. 1000 monet"
+            type="number"
+            value={prizeCoins}
+            onChange={e => setPrizeCoins(Math.max(0, Number(e.target.value) || 0))}
+            placeholder="0"
+            min={0}
             className={inputClass}
           />
         </div>

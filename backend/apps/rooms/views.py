@@ -7,10 +7,11 @@ from rest_framework import status, serializers as drf_serializers
 from django.core.cache import cache
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, inline_serializer
-from .models import Room, Player, QuestionPack, CustomQuestion, PublicTournamentConfig
+from .models import Room, Player, QuestionPack, CustomQuestion, PublicTournamentConfig, Tournament, TournamentParticipant
 from .serializers import (
     CreateRoomSerializer, JoinRoomSerializer,
-    RoomSerializer, LeaderboardSerializer
+    RoomSerializer, LeaderboardSerializer,
+    TournamentSerializer, TournamentDetailSerializer, CreateTournamentSerializer,
 )
 
 CACHE_TTL_ROOM_HISTORY = 60  # 1 minuta
@@ -685,3 +686,186 @@ class TriggerPublicTournamentView(APIView):
             'room_id': room.code,
             'start_time': start_time.isoformat(),
         }, status=status.HTTP_201_CREATED)
+
+
+# ─── User Tournaments ──────────────────────────────────────────────────
+
+def _sync_tournament_statuses(qs):
+    """Aktualizuje statusy turniejów w queryset na podstawie aktualnych dat."""
+    now = timezone.now()
+    to_update = []
+    for t in qs:
+        new_status = (
+            Tournament.Status.UPCOMING if now < t.start_date
+            else Tournament.Status.FINISHED if now > t.end_date
+            else Tournament.Status.ACTIVE
+        )
+        if t.status != new_status:
+            t.status = new_status
+            to_update.append(t)
+    if to_update:
+        Tournament.objects.bulk_update(to_update, ['status'])
+
+
+class TournamentListView(APIView):
+    """GET /api/tournaments/ — lista turniejów; POST — utwórz turniej."""
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary='Lista turniejów',
+        description='Lista turniejów z opcjonalnym filtrem statusu (?status=upcoming|active|finished).',
+        responses={200: TournamentSerializer(many=True)},
+        tags=['tournaments'],
+    )
+    def get(self, request):
+        from django.db.models import Count
+        qs = Tournament.objects.select_related('creator__profile').annotate(
+            _participant_count=Count('participants'),
+        )
+        _sync_tournament_statuses(qs)
+
+        status_filter = request.query_params.get('status')
+        if status_filter in {'upcoming', 'active', 'finished'}:
+            qs = qs.filter(status=status_filter)
+
+        serializer = TournamentSerializer(qs, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary='Utwórz turniej',
+        request=CreateTournamentSerializer,
+        responses={201: TournamentSerializer},
+        tags=['tournaments'],
+    )
+    def post(self, request):
+        serializer = CreateTournamentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        now = timezone.now()
+        if data['end_date'] < now:
+            return Response(
+                {'error': 'Nie można utworzyć turnieju, który już się zakończył.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        initial_status = (
+            Tournament.Status.UPCOMING if now < data['start_date']
+            else Tournament.Status.ACTIVE
+        )
+
+        tournament = Tournament.objects.create(
+            name=data['name'],
+            description=data.get('description', ''),
+            icon=data.get('icon', '🏆'),
+            category=data['category'],
+            creator=request.user,
+            start_date=data['start_date'],
+            end_date=data['end_date'],
+            max_participants=data['max_participants'],
+            prize_coins=data['prize_coins'],
+            is_open=data['is_open'],
+            status=initial_status,
+        )
+        # Twórca automatycznie dołącza
+        TournamentParticipant.objects.create(tournament=tournament, user=request.user)
+
+        out = TournamentSerializer(tournament, context={'request': request})
+        return Response(out.data, status=status.HTTP_201_CREATED)
+
+
+class TournamentDetailView(APIView):
+    """GET /api/tournaments/<pk>/ — szczegóły turnieju z leaderboardem."""
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary='Szczegóły turnieju',
+        responses={
+            200: TournamentDetailSerializer,
+            404: inline_serializer('TournamentNotFound', fields={'error': drf_serializers.CharField()}),
+        },
+        tags=['tournaments'],
+    )
+    def get(self, request, pk):
+        try:
+            tournament = Tournament.objects.select_related('creator__profile').get(pk=pk)
+        except Tournament.DoesNotExist:
+            return Response({'error': 'Turniej nie znaleziony'}, status=status.HTTP_404_NOT_FOUND)
+
+        tournament.sync_status()
+        serializer = TournamentDetailSerializer(tournament, context={'request': request})
+        return Response(serializer.data)
+
+
+class TournamentJoinView(APIView):
+    """POST /api/tournaments/<pk>/join/"""
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary='Dołącz do turnieju',
+        responses={
+            200: inline_serializer('TournamentJoinResult', fields={'message': drf_serializers.CharField()}),
+            400: inline_serializer('TournamentJoinError', fields={'error': drf_serializers.CharField()}),
+            404: inline_serializer('TournamentJoinNotFound', fields={'error': drf_serializers.CharField()}),
+        },
+        tags=['tournaments'],
+    )
+    def post(self, request, pk):
+        try:
+            tournament = Tournament.objects.get(pk=pk)
+        except Tournament.DoesNotExist:
+            return Response({'error': 'Turniej nie znaleziony'}, status=status.HTTP_404_NOT_FOUND)
+
+        tournament.sync_status()
+        if tournament.status == Tournament.Status.FINISHED:
+            return Response({'error': 'Turniej już się zakończył'}, status=status.HTTP_400_BAD_REQUEST)
+        if not tournament.is_open:
+            return Response({'error': 'Turniej zamknięty'}, status=status.HTTP_400_BAD_REQUEST)
+        if TournamentParticipant.objects.filter(tournament=tournament, user=request.user).exists():
+            return Response({'error': 'Już dołączyłeś do tego turnieju'}, status=status.HTTP_400_BAD_REQUEST)
+        if tournament.participants.count() >= tournament.max_participants:
+            return Response({'error': 'Turniej jest pełny'}, status=status.HTTP_400_BAD_REQUEST)
+
+        TournamentParticipant.objects.create(tournament=tournament, user=request.user)
+        return Response({'message': f'Dołączyłeś do turnieju {tournament.name}'})
+
+
+class TournamentLeaveView(APIView):
+    """POST /api/tournaments/<pk>/leave/"""
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary='Opuść turniej',
+        responses={
+            200: inline_serializer('TournamentLeaveResult', fields={'message': drf_serializers.CharField()}),
+            400: inline_serializer('TournamentLeaveError', fields={'error': drf_serializers.CharField()}),
+            404: inline_serializer('TournamentLeaveNotFound', fields={'error': drf_serializers.CharField()}),
+        },
+        tags=['tournaments'],
+    )
+    def post(self, request, pk):
+        try:
+            participation = TournamentParticipant.objects.select_related('tournament').get(
+                tournament_id=pk, user=request.user,
+            )
+        except TournamentParticipant.DoesNotExist:
+            return Response({'error': 'Nie należysz do tego turnieju'}, status=status.HTTP_404_NOT_FOUND)
+
+        tournament = participation.tournament
+        tournament.sync_status()
+        if tournament.status == Tournament.Status.FINISHED:
+            return Response({'error': 'Nie można opuścić zakończonego turnieju'}, status=status.HTTP_400_BAD_REQUEST)
+        if tournament.creator_id == request.user.id and tournament.participants.exclude(user=request.user).exists():
+            return Response(
+                {'error': 'Jako twórca turnieju nie możesz go opuścić, dopóki są inni uczestnicy.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        participation.delete()
+        # Jeśli twórca opuszcza pusty turniej — usuwamy go
+        if tournament.creator_id == request.user.id and not tournament.participants.exists():
+            tournament.delete()
+            return Response({'message': 'Opuściłeś turniej i został on usunięty'})
+
+        return Response({'message': f'Opuściłeś turniej {tournament.name}'})
