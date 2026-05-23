@@ -26,6 +26,9 @@ AVATAR_CHOICES = [
 ]
 
 AVATAR_EMOJI = dict(AVATAR_CHOICES)
+STARTER_AVATAR_CODE = 'fox'
+DEFAULT_THEME_CODE = 'default'
+POWERUP_CODES = ('fifty_fifty', 'extra_time', 'double_points')
 
 
 class UserProfile(models.Model):
@@ -35,6 +38,7 @@ class UserProfile(models.Model):
     weekly_score = models.IntegerField(default=0)
     games_played = models.IntegerField(default=0)
     avatar = models.CharField(max_length=20, choices=AVATAR_CHOICES, default='fox')
+    theme = models.CharField(max_length=20, default=DEFAULT_THEME_CODE)
     coins = models.IntegerField(default=0)
     last_daily_bonus = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -77,6 +81,7 @@ class Achievement(models.Model):
         SPEED_DEMON = 'speed_demon', 'Speed Demon'
         COMEBACK_KING = 'comeback_king', 'Comeback King'
 
+    code = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=50)
     description = models.TextField()
     icon = models.CharField(max_length=10)
@@ -210,10 +215,14 @@ class SeasonResult(models.Model):
 
 class ShopItem(models.Model):
     class ItemType(models.TextChoices):
+        AVATAR = 'avatar', 'Avatar'
+        POWERUP = 'powerup', 'Power-up'
+        THEME = 'theme', 'Motyw'
         PROFILE_FRAME = 'profile_frame', 'Ramka profilu'
         CONFETTI_EFFECT = 'confetti_effect', 'Efekt confetti'
         TITLE = 'title', 'Tytuł'
 
+    code = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=50)
     description = models.TextField()
     item_type = models.CharField(max_length=20, choices=ItemType.choices)
@@ -233,6 +242,7 @@ class UserItem(models.Model):
     item = models.ForeignKey(ShopItem, on_delete=models.CASCADE, related_name='owners')
     purchased_at = models.DateTimeField(auto_now_add=True)
     is_equipped = models.BooleanField(default=False)
+    quantity = models.IntegerField(default=1)
 
     class Meta:
         db_table = 'user_items'

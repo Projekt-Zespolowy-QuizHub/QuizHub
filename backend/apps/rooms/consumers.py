@@ -33,6 +33,28 @@ _double_points_active: dict[tuple[str, str], bool] = {}
 _survival_eliminated: dict[tuple[str, str], bool] = {}
 
 
+def _consume_powerup_for_user(user_id: int, powerup_code: str) -> int | None:
+    from django.db import transaction
+    from apps.accounts.models import ShopItem, UserItem
+
+    with transaction.atomic():
+        try:
+            user_item = UserItem.objects.select_for_update().get(
+                user_id=user_id,
+                item__code=powerup_code,
+                item__item_type=ShopItem.ItemType.POWERUP,
+            )
+        except UserItem.DoesNotExist:
+            return None
+
+        if user_item.quantity <= 0:
+            return None
+
+        user_item.quantity -= 1
+        user_item.save(update_fields=['quantity'])
+        return user_item.quantity
+
+
 def _update_profile_after_game(player, is_winner: bool = False):
     """Aktualizuje statystyki UserProfile po zakończonej grze. Wywołanie synchroniczne."""
     from .models import Answer
@@ -497,6 +519,11 @@ class GameConsumer(AsyncWebsocketConsumer):
         powerup = result
         nickname = data.get('nickname')
         round_number = data.get('round_number')
+        user = self.scope.get('user')
+
+        if not user or not user.is_authenticated:
+            await self._send_error('Zaloguj się, aby używać power-upów')
+            return
 
         key = (self.room_code, nickname)
         used = _powerups_used.setdefault(key, set())
@@ -506,38 +533,58 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         logger.debug('WS powerup: pokój=%s nick=%s powerup=%s', self.room_code, nickname, powerup)
 
-        used.add(powerup)
-
         if powerup == 'fifty_fifty':
-            await self._handle_fifty_fifty(round_number, Room, Question)
+            removed_options = await self._get_fifty_fifty_options(round_number, Room, Question)
+            if removed_options is None:
+                return
+            remaining_quantity = await database_sync_to_async(_consume_powerup_for_user)(user.id, powerup)
+            if remaining_quantity is None:
+                await self._send_error('Brak tego power-upa w ekwipunku')
+                return
+            used.add(powerup)
+            await self.send(json.dumps({
+                'type': 'powerup_result',
+                'powerup': 'fifty_fifty',
+                'removed_options': removed_options,
+                'remaining_quantity': remaining_quantity,
+            }))
         elif powerup == 'extra_time':
+            remaining_quantity = await database_sync_to_async(_consume_powerup_for_user)(user.id, powerup)
+            if remaining_quantity is None:
+                await self._send_error('Brak tego power-upa w ekwipunku')
+                return
+            used.add(powerup)
             await self.send(json.dumps({
                 'type': 'powerup_result',
                 'powerup': 'extra_time',
                 'extra_seconds': EXTRA_TIME_SECONDS,
+                'remaining_quantity': remaining_quantity,
             }))
         elif powerup == 'double_points':
+            remaining_quantity = await database_sync_to_async(_consume_powerup_for_user)(user.id, powerup)
+            if remaining_quantity is None:
+                await self._send_error('Brak tego power-upa w ekwipunku')
+                return
+            used.add(powerup)
             _double_points_active[key] = True
-            await self.send(json.dumps({'type': 'powerup_result', 'powerup': 'double_points'}))
+            await self.send(json.dumps({
+                'type': 'powerup_result',
+                'powerup': 'double_points',
+                'remaining_quantity': remaining_quantity,
+            }))
 
-    async def _handle_fifty_fifty(self, round_number: int, Room, Question) -> None:
-        """Usuwa 2 błędne opcje dla power-upu fifty-fifty."""
+    async def _get_fifty_fifty_options(self, round_number: int, Room, Question) -> list[str] | None:
+        """Zwraca 2 błędne opcje dla power-upu fifty-fifty."""
         try:
             room = await database_sync_to_async(Room.objects.get)(code=self.room_code)
             question = await database_sync_to_async(
                 Question.objects.get)(room=room, round_number=round_number)
         except Exception:
-            return
+            return None
 
         correct = question.correct_answer
         wrong = [letter for letter in ['A', 'B', 'C', 'D'] if letter != correct]
-        to_remove = random.sample(wrong, 2)
-
-        await self.send(json.dumps({
-            'type': 'powerup_result',
-            'powerup': 'fifty_fifty',
-            'removed_options': to_remove,
-        }))
+        return random.sample(wrong, 2)
 
     async def handle_chat_message(self, data):
         """Gracz wysłał wiadomość na czacie lobby."""

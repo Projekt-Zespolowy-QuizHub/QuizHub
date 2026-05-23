@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthProvider';
-import { api, Achievement, UserStats } from '@/lib/api';
-import { AVATARS, getAvatarEmoji } from '@/lib/avatars';
+import { api, Achievement, ShopItem, UserStats } from '@/lib/api';
+import { getAvatarEmoji } from '@/lib/avatars';
 import { TabBar } from '@/components/TabBar';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Skeleton, SkeletonCard, SkeletonProfile } from '@/components/Skeleton';
@@ -103,30 +103,43 @@ function AchievementsTab({ achievements }: { achievements: Achievement[] | null 
 }
 
 interface AvatarTabProps {
+  avatars: ShopItem[] | null;
   currentAvatar: string;
   saving: boolean;
   onSelect: (key: string) => void;
 }
 
-function AvatarTab({ currentAvatar, saving, onSelect }: AvatarTabProps) {
+function AvatarTab({ avatars, currentAvatar, saving, onSelect }: AvatarTabProps) {
   const { t } = useLocale();
+  if (avatars === null) {
+    return (
+      <div className="glass-card p-6">
+        <Skeleton className="h-5 w-40 mb-4" />
+        <div className="grid grid-cols-5 gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="aspect-square rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="glass-card p-6">
       <h3 className="text-white font-bold mb-4">{t('profile_choose_avatar')}</h3>
       <div className="grid grid-cols-5 gap-3">
-        {AVATARS.map(a => (
+        {avatars.map((avatar) => (
           <button
-            key={a.key}
-            onClick={() => onSelect(a.key)}
+            key={avatar.code}
+            onClick={() => onSelect(avatar.code)}
             disabled={saving}
             className={`aspect-square rounded-xl text-3xl flex items-center justify-center transition-all ${
-              currentAvatar === a.key
+              currentAvatar === avatar.code
                 ? 'bg-yellow-400/20 border-2 border-yellow-400 scale-110'
                 : 'bg-white/5 border-2 border-transparent hover:bg-white/10 hover:scale-105'
             }`}
-            title={a.key}
+            title={avatar.name}
           >
-            {a.emoji}
+            {avatar.emoji_icon}
           </button>
         ))}
       </div>
@@ -143,6 +156,7 @@ export default function ProfilePage() {
   const [tab, setTab] = useState<Tab>('stats');
   const [stats, setStats] = useState<UserStats | null>(null);
   const [achievements, setAchievements] = useState<Achievement[] | null>(null);
+  const [avatars, setAvatars] = useState<ShopItem[] | null>(null);
   const [savingAvatar, setSavingAvatar] = useState(false);
 
   const TABS = [
@@ -161,12 +175,26 @@ export default function ProfilePage() {
     }
   }, [tab]);
 
+  useEffect(() => {
+    if (tab === 'avatar') {
+      api.getShopItems()
+        .then((items) => {
+          setAvatars(items.filter((item) => item.item_type === 'avatar' && item.owned));
+        })
+        .catch(() => setAvatars([]));
+    }
+  }, [tab, user?.avatar]);
+
   const handleAvatarSelect = async (key: string) => {
     if (savingAvatar) return;
     setSavingAvatar(true);
     try {
       await api.updateAvatar(key);
       await refresh();
+      const items = await api.getShopItems().catch(() => null);
+      if (items) {
+        setAvatars(items.filter((item) => item.item_type === 'avatar' && item.owned));
+      }
     } finally {
       setSavingAvatar(false);
     }
@@ -201,6 +229,7 @@ export default function ProfilePage() {
       {tab === 'achievements' && <AchievementsTab achievements={achievements} />}
       {tab === 'avatar' && (
         <AvatarTab
+          avatars={avatars}
           currentAvatar={user.avatar}
           saving={savingAvatar}
           onSelect={handleAvatarSelect}
