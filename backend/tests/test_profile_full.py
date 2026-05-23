@@ -9,7 +9,7 @@ import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
-from apps.accounts.models import UserProfile
+from apps.accounts.models import ShopItem, UserItem, UserProfile
 
 
 # ---------------------------------------------------------------------------
@@ -33,6 +33,21 @@ def client_a(user_a):
 @pytest.fixture
 def anon_client():
     return APIClient()
+
+
+def _grant_owned_avatar(user, code: str):
+    item, _ = ShopItem.objects.get_or_create(
+        code=code,
+        defaults={
+            'name': code.title(),
+            'description': f'Avatar {code}',
+            'item_type': ShopItem.ItemType.AVATAR,
+            'price': 100,
+            'emoji_icon': '🦊',
+        },
+    )
+    UserItem.objects.get_or_create(user=user, item=item)
+    return item
 
 
 # ---------------------------------------------------------------------------
@@ -192,20 +207,23 @@ def test_achievements_unlocked_field_is_bool(client_a):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.django_db
-def test_update_avatar_valid_value_returns_200(client_a):
+def test_update_avatar_valid_value_returns_200(client_a, user_a):
+    _grant_owned_avatar(user_a, 'wolf')
     response = client_a.patch('/api/profile/avatar/', {'avatar': 'wolf'}, format='json')
     assert response.status_code == 200
 
 
 @pytest.mark.django_db
 def test_update_avatar_persists_change(client_a, user_a):
+    _grant_owned_avatar(user_a, 'lion')
     client_a.patch('/api/profile/avatar/', {'avatar': 'lion'}, format='json')
     user_a.profile.refresh_from_db()
     assert user_a.profile.avatar == 'lion'
 
 
 @pytest.mark.django_db
-def test_update_avatar_returns_avatar_key(client_a):
+def test_update_avatar_returns_avatar_key(client_a, user_a):
+    _grant_owned_avatar(user_a, 'bear')
     response = client_a.patch('/api/profile/avatar/', {'avatar': 'bear'}, format='json')
     data = response.json()
     assert data['avatar'] == 'bear'
@@ -230,12 +248,15 @@ def test_update_avatar_unauthenticated_returns_403(anon_client):
 
 
 @pytest.mark.django_db
-def test_update_avatar_all_valid_choices(client_a):
+def test_update_avatar_all_valid_choices(client_a, user_a):
     valid_avatars = [
         'fox', 'wolf', 'lion', 'tiger', 'bear', 'raccoon', 'frog',
         'penguin', 'owl', 'butterfly', 'dragon', 'unicorn', 'octopus',
         'shark', 'turtle', 'cat', 'robot', 'alien', 'ninja', 'wizard',
     ]
+    for avatar in valid_avatars:
+        if avatar != 'fox':
+            _grant_owned_avatar(user_a, avatar)
     for avatar in valid_avatars:
         response = client_a.patch('/api/profile/avatar/', {'avatar': avatar}, format='json')
         assert response.status_code == 200, f"Avatar '{avatar}' should be valid, got {response.status_code}"

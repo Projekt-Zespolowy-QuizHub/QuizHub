@@ -81,7 +81,6 @@ class Achievement(models.Model):
         SPEED_DEMON = 'speed_demon', 'Speed Demon'
         COMEBACK_KING = 'comeback_king', 'Comeback King'
 
-    code = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=50)
     description = models.TextField()
     icon = models.CharField(max_length=10)
