@@ -1,13 +1,43 @@
 # Production Deployment
 
-This repository did not include a complete production `docker-compose` setup. Use the files added for production deployment:
+This is the production source of truth for `QuizHub`. It describes the real VPS, the real deployment branch, the current production commit, and the exact commands used on the server.
 
-- `docker-compose.prod.yml`
-- `.env.prod.example`
+## Production Server
+
+- Host type: VPS
+- Hostname: `QuizHub`
+- Public domain: `quizhub.tech`
+- Public aliases: `www.quizhub.tech`
+- Public IPv4: `165.245.212.111`
+- Private IPv4: `10.114.0.2`
+
+## Deployment Source of Truth
+
+- Deployment branch: `deployment`
+- Current deployment target: `48f1efd9eaeab86732f965d7dd6c519541c015f1`
+- Rollback reference for the current release wave: `f8ed926ce56a92807e5d06e25d51566e9e19df3f`
+- Rule: after every successful production deploy, update this file with the new production commit, the previous rollback commit, verification date, and operator.
+
+## Current Production State
+
+- Current deployed commit: `f8ed926ce56a92807e5d06e25d51566e9e19df3f`
+- Current deployed branch: `deployment`
+- Last verified date: `2026-05-23`
+- Last operator: `Codex via SSH inspection`
+- Migrations included: current production is still on commit `f8ed926`; the pending target `48f1efd` is a newer deployment branch state and has not been deployed yet.
+
+## Server-Specific Values
+
+- SSH target: `root@165.245.212.111`
+- Repository path on VPS: `/opt/quizhub-prod`
+- Compose project name: `quizhub-prod`
+- Environment file on VPS: `/opt/quizhub-prod/.env.prod`
+- Compose file on VPS: `/opt/quizhub-prod/docker-compose.prod.yml`
+- Secret material such as the root password must stay only in the local ignored supplement: `docs/PRODUCTION_DEPLOYMENT.local.md`
 
 ## Actual Environment Variables
 
-The code currently reads these backend variables from `backend/quizarena/settings.py`:
+The backend reads these variables from `backend/quizarena/settings.py`:
 
 - `DJANGO_SECRET_KEY`
 - `DEBUG`
@@ -28,7 +58,7 @@ The code currently reads these backend variables from `backend/quizarena/setting
 - `CSRF_COOKIE_SECURE`
 - `SECURE_SSL_REDIRECT`
 
-The frontend currently reads:
+The frontend reads:
 
 - `BACKEND_INTERNAL_URL`
 - `NEXT_PUBLIC_API_URL`
@@ -37,10 +67,18 @@ The frontend currently reads:
 
 ## Deploy With a Domain and HTTPS
 
-1. Copy `.env.prod.example` to `.env.prod`.
-2. Replace the placeholder secrets and domain values.
-3. Point both `quizhub.tech` and `www.quizhub.tech` to the server IP.
-4. Install Certbot on the host and create the challenge webroot:
+1. Log into the VPS and move to the production repo:
+
+```bash
+ssh root@165.245.212.111
+cd /opt/quizhub-prod
+```
+
+2. Prepare `.env.prod` from `.env.prod.example` if it does not already exist, then update secrets and domain values.
+
+3. Make sure both `quizhub.tech` and `www.quizhub.tech` point to `165.245.212.111`.
+
+4. Install Certbot on the host and create the ACME webroot if this is the first HTTPS setup:
 
 ```bash
 sudo apt-get update
@@ -48,10 +86,11 @@ sudo apt-get install -y certbot
 sudo mkdir -p /var/www/certbot
 ```
 
-5. Issue the certificate on the host before enabling the TLS Nginx config:
+5. Issue the certificate before enabling TLS if the host does not already have the certificate:
 
 ```bash
-docker compose --env-file .env.prod -f docker-compose.prod.yml stop nginx
+cd /opt/quizhub-prod
+docker compose -p quizhub-prod --env-file .env.prod -f docker-compose.prod.yml stop nginx
 sudo certbot certonly --standalone \
   -d quizhub.tech \
   -d www.quizhub.tech \
@@ -60,28 +99,72 @@ sudo certbot certonly --standalone \
   --no-eff-email
 ```
 
-6. Build and start:
+6. Pull the deployment branch and confirm the expected target commit:
 
 ```bash
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+cd /opt/quizhub-prod
+git fetch origin
+git checkout deployment
+git pull origin deployment
+git rev-parse HEAD
 ```
 
-7. Verify:
+Expected `HEAD` for the next deploy:
+
+```text
+48f1efd9eaeab86732f965d7dd6c519541c015f1
+```
+
+7. Build and start production:
 
 ```bash
-docker compose --env-file .env.prod -f docker-compose.prod.yml ps
+cd /opt/quizhub-prod
+docker compose -p quizhub-prod --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+The backend entrypoint runs `python manage.py migrate --noinput` and `python manage.py collectstatic --noinput --clear` automatically at container startup.
+
+## Verification on Server
+
+Use these commands on the VPS to verify the deployment context and runtime state:
+
+```bash
+cd /opt/quizhub-prod
+pwd
+git rev-parse HEAD
+git rev-parse --abbrev-ref HEAD
+docker compose ls
+docker compose -p quizhub-prod --env-file .env.prod -f docker-compose.prod.yml ps
 curl -I https://quizhub.tech/
+curl -I https://quizhub.tech/healthz
 curl https://quizhub.tech/api/schema/
 ```
 
-8. Renew automatically from the host with a post-hook reload:
+The production repo path should be `/opt/quizhub-prod`, the branch should be `deployment`, and `docker compose ls` should show the project `quizhub-prod`.
+
+## Rollback
+
+If the current release wave must be reverted, roll back to `f8ed926ce56a92807e5d06e25d51566e9e19df3f`:
 
 ```bash
-sudo certbot renew --post-hook "cd /PATH/TO/REPO && docker compose --env-file .env.prod -f docker-compose.prod.yml restart nginx"
+cd /opt/quizhub-prod
+git fetch origin
+git checkout f8ed926ce56a92807e5d06e25d51566e9e19df3f
+docker compose -p quizhub-prod --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+This leaves the repo in detached `HEAD` state. Before the next normal deploy, switch back to the `deployment` branch and pull from `origin/deployment`.
+
+## Renewal
+
+Renew certificates automatically from the host with a post-hook reload:
+
+```bash
+sudo certbot renew --post-hook "cd /opt/quizhub-prod && docker compose -p quizhub-prod --env-file .env.prod -f docker-compose.prod.yml restart nginx"
 ```
 
 ## Notes
 
 - Nginx serves ACME challenge files from `/var/www/certbot` mounted from the host.
 - Certificates are expected at `/etc/letsencrypt/live/quizhub.tech/`.
-- Keep `165.245.212.111` in `ALLOWED_HOSTS` if you still want direct IP access for diagnostics.
+- Keep `165.245.212.111` in `ALLOWED_HOSTS` if direct IP diagnostics are still needed.

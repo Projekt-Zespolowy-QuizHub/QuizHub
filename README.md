@@ -26,8 +26,10 @@
 - Production app runs at **https://quizhub.tech**
 - `http://quizhub.tech` redirects to HTTPS
 - `https://www.quizhub.tech` is covered by the same deployment
+- Production VPS public IP is `165.245.212.111`
 - SSL/TLS certificate is issued by **Let's Encrypt**
 - Production Docker and Nginx deployment config is maintained on branch `deployment`
+- Exact runbook and current production version are documented in `docs/PRODUCTION_DEPLOYMENT.md`
 
 Production setup on this branch includes:
 
